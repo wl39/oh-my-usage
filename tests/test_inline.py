@@ -52,6 +52,7 @@ _oh_my_usage_refresh() { print unexpected-worker >> "$TEST_WORKER"; }
         env = dict(os.environ, HOME=str(root), ZDOTDIR=str(root),
                    PLUGIN=str(ROOT / "oh-my-usage.plugin.zsh"),
                    OH_MY_USAGE_CACHE_DIR=str(root), OH_MY_USAGE_INLINE=enabled,
+                   OH_MY_USAGE_CONFIG_DIR=str(root / "config"),
                    OH_MY_USAGE_DISPLAY="status", OH_MY_USAGE_INLINE_COLOR="245",
                    OH_MY_USAGE_INTERVAL="3600", TERM="xterm-256color",
                    TERM_PROGRAM=term_program, TMUX="", STY="", OH_MY_USAGE_INLINE_WIDTH="",
@@ -146,6 +147,48 @@ class InlineTests(unittest.TestCase):
         final = editor.wait()
         self.assertGreater(int(final[6]), int(first[6]))
         self.assertFalse((editor.root / "worker").exists())
+
+    def test_saved_choice_reaches_other_and_new_sessions_but_session_override_does_not(self):
+        with tempfile.TemporaryDirectory() as temp:
+            shared = {"OH_MY_USAGE_CONFIG_DIR": temp}
+            first = self.editor(enabled="off", extra_env=shared)
+            other = self.editor(enabled="off", extra_env=shared)
+            first.wait(visible=False, active="0")
+            other.wait(visible=False, active="0")
+            first.command("oh-my-usage inline on")
+            first.wait()
+            self.assertEqual((Path(temp) / "inline").read_text(), "on\n")
+            # Already-open shells adopt the saved value at their next prompt.
+            other.command(":")
+            other.wait()
+            fresh = self.editor(enabled="off", extra_env=shared)
+            fresh.wait()
+            first.command("oh-my-usage inline off --session")
+            first.wait(visible=False, active="0")
+            self.assertEqual((Path(temp) / "inline").read_text(), "on\n")
+            other.command(":")
+            other.wait()
+            first.command("oh-my-usage inline off")
+            first.wait(visible=False, active="0")
+            other.command(":")
+            other.wait(visible=False, active="0")
+            fresh.command(":")
+            fresh.wait(visible=False, active="0")
+            # Saving a new value also clears this shell's temporary override.
+            first.command("oh-my-usage inline on --session")
+            first.wait()
+            first.command("oh-my-usage inline off")
+            first.wait(visible=False, active="0")
+
+    def test_invalid_saved_text_is_never_executed(self):
+        editor = self.editor(enabled="off")
+        editor.wait(visible=False, active="0")
+        directory = editor.root / "config"
+        directory.mkdir()
+        (directory / "inline").write_text('$(touch INJECTED)\n')
+        editor.command(":")
+        editor.wait(visible=False, active="0")
+        self.assertFalse((editor.root / "INJECTED").exists())
 
     def test_toggle_theme_changes_and_unload(self):
         editor = self.editor(enabled="off")

@@ -1,18 +1,20 @@
 # iTerm2 status-bar transport, with an optional empty-input right prompt.
 [[ -o interactive ]] || return 0
 if (( ${+_OH_MY_USAGE_LOADED} )); then
-  [[ ${_OH_MY_USAGE_VERSION:-} == 0.4.0 ]] && return 0
+  [[ ${_OH_MY_USAGE_VERSION:-} == 0.5.0 ]] && return 0
   # Restore the theme before replacing a previously loaded version.
   (( ${+functions[oh-my-usage-unload]} )) && oh-my-usage-unload
 fi
-typeset -g _OH_MY_USAGE_LOADED=1 _OH_MY_USAGE_VERSION=0.4.0
+typeset -g _OH_MY_USAGE_LOADED=1 _OH_MY_USAGE_VERSION=0.5.0
 typeset -g _OH_MY_USAGE_ROOT=${${(%):-%x}:A:h}
 typeset -g _OH_MY_USAGE_CACHE=${OH_MY_USAGE_CACHE_DIR:-$HOME/Library/Caches/oh-my-usage}
+typeset -g _OH_MY_USAGE_CONFIG=${OH_MY_USAGE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/oh-my-usage}
 typeset -g _OH_MY_USAGE_NEXT=0 OH_MY_USAGE_TEXT=''
 typeset -g _OH_MY_USAGE_ENCODED='?'
 zmodload zsh/datetime
 autoload -Uz add-zsh-hook
 
+source "$_OH_MY_USAGE_ROOT/zsh/config.zsh"
 source "$_OH_MY_USAGE_ROOT/zsh/inline.zsh"
 
 oh-my-usage() {
@@ -20,7 +22,12 @@ oh-my-usage() {
     shift
     _oh_my_usage_inline_control "$@"
   else
-    "$_OH_MY_USAGE_ROOT/bin/oh-my-usage" "$@"
+    "$_OH_MY_USAGE_ROOT/bin/oh-my-usage" "$@" || return $?
+    if [[ ${1:-} == start ]]; then
+      typeset -g OH_MY_USAGE_DISPLAY=status
+      _oh_my_usage_inline_sync
+      _oh_my_usage_publish
+    fi
   fi
 }
 
@@ -60,7 +67,7 @@ _oh_my_usage_precmd() {
     return 0
   fi
   # SSH clients need only ZLE. iTerm2's OSC transport is independent of it.
-  [[ ${OH_MY_USAGE_INLINE:-off} == on ]] || _oh_my_usage_status_supported || return 0
+  [[ $_OH_MY_USAGE_INLINE_MODE == on ]] || _oh_my_usage_status_supported || return 0
   local stamp=0 interval=${OH_MY_USAGE_INTERVAL:-30}
   [[ $interval == <-> ]] || interval=30
   (( interval < 5 )) && interval=5
@@ -81,6 +88,7 @@ oh-my-usage-unload() {
   _oh_my_usage_inline_disable
   _oh_my_usage_emit ''
   unset _OH_MY_USAGE_LOADED _OH_MY_USAGE_VERSION _OH_MY_USAGE_ENCODED OH_MY_USAGE_TEXT
+  unset _OH_MY_USAGE_INLINE_SESSION _OH_MY_USAGE_INLINE_MODE _OH_MY_USAGE_INLINE_ORIGIN
 }
 
 add-zsh-hook precmd _oh_my_usage_precmd

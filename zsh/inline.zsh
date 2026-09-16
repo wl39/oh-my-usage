@@ -1,21 +1,37 @@
 # Optional ZLE display. Only shell builtins run while editing input.
 _oh_my_usage_inline_control() {
-  case ${1:-status} in
+  local action=${1:-status}
+  (( $# )) && shift
+  case $action in
     on|off)
-      typeset -g OH_MY_USAGE_INLINE=$1
+      if (( $# == 0 )); then
+        "$_OH_MY_USAGE_ROOT/bin/oh-my-usage" inline "$action" || return $?
+        unset _OH_MY_USAGE_INLINE_SESSION
+      elif (( $# == 1 )) && [[ $1 == --session ]]; then
+        typeset -g _OH_MY_USAGE_INLINE_SESSION=$action
+        print -r -- "inline: $action (session)"
+      else
+        print -u2 'Usage: oh-my-usage inline on|off [--session]'
+        return 2
+      fi
       # An explicit first enable should show data at the very next prompt.
-      if [[ $1 == on && ! -r "$_OH_MY_USAGE_CACHE/display" ]]; then
+      if [[ $action == on && ! -r "$_OH_MY_USAGE_CACHE/display" ]]; then
         oh-my-usage show > /dev/null
       fi
       _oh_my_usage_inline_sync
       ;;
-    status) print -r -- "inline: ${OH_MY_USAGE_INLINE:-off}" ;;
-    *) print -u2 -r -- 'Usage: oh-my-usage inline [on|off|status]'; return 2 ;;
+    status)
+      (( $# == 0 )) || { print -u2 'Usage: oh-my-usage inline status'; return 2; }
+      _oh_my_usage_inline_load
+      print -r -- "inline: $_OH_MY_USAGE_INLINE_MODE ($_OH_MY_USAGE_INLINE_ORIGIN)"
+      ;;
+    *) "$_OH_MY_USAGE_ROOT/bin/oh-my-usage" inline "$action" "$@" ;;
   esac
 }
 
 _oh_my_usage_inline_sync() {
-  if [[ ${OH_MY_USAGE_INLINE:-off} == on && ${OH_MY_USAGE_DISPLAY:-status} != off ]]; then
+  _oh_my_usage_inline_load
+  if [[ $_OH_MY_USAGE_INLINE_MODE == on && ${OH_MY_USAGE_DISPLAY:-status} != off ]]; then
     [[ ${_OH_MY_USAGE_INLINE_ACTIVE:-0} == 1 ]] && return 0
     typeset -g _OH_MY_USAGE_INLINE_ACTIVE=1 _OH_MY_USAGE_INLINE_VISIBLE=0
     typeset -g _OH_MY_USAGE_INLINE_BASE=$RPROMPT _OH_MY_USAGE_INLINE_APPLIED=$RPROMPT
@@ -60,7 +76,7 @@ _oh_my_usage_inline_update() {
   [[ $PROMPT == "$_OH_MY_USAGE_INLINE_LEFT_APPLIED" ]] || _OH_MY_USAGE_INLINE_LEFT_BASE=$PROMPT
   local desired=$_OH_MY_USAGE_INLINE_BASE previous_render=$_OH_MY_USAGE_INLINE_RENDERED
   local desired_left=$_OH_MY_USAGE_INLINE_LEFT_BASE hint
-  if [[ ${OH_MY_USAGE_INLINE:-off} == on && ${OH_MY_USAGE_DISPLAY:-status} != off &&
+  if [[ $_OH_MY_USAGE_INLINE_MODE == on && ${OH_MY_USAGE_DISPLAY:-status} != off &&
         $CONTEXT == start && -z $BUFFER && -z $PREBUFFER ]]; then
     if [[ $_OH_MY_USAGE_INLINE_VISIBLE == 0 || $_OH_MY_USAGE_INLINE_COLUMNS != $COLUMNS ]]; then
       local stamp text=$OH_MY_USAGE_TEXT color=${OH_MY_USAGE_INLINE_COLOR:-245}

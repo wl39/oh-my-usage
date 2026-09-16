@@ -3,13 +3,14 @@
 emulate -LR zsh
 set -eu
 typeset root=${0:A:h}
-typeset mode=${1:-}
-case $mode in
-  full|existing|uninstall) shift ;;
-  *) print 'Usage: ./install.sh full|existing|uninstall [--no-shell] [--prefix PATH]'; exit 2 ;;
-esac
+typeset mode=full
+if (( $# )) && [[ $1 == (full|existing|uninstall) ]]; then
+  mode=$1
+  shift
+fi
 if [[ ${1:-} == --help || ${1:-} == -h ]]; then
-  print 'Options: --no-shell --prefix PATH'
+  print 'Usage: ./install.sh [full|existing|uninstall] [--no-shell] [--prefix PATH]'
+  print 'Default: reuse OpenUsage if installed, otherwise install it through Homebrew.'
   exit 0
 fi
 typeset -a forwarded=("$@")
@@ -41,7 +42,7 @@ need_brew() {
 }
 
 if [[ $mode == existing && -z $app ]]; then
-  print -u2 'OpenUsage was not found. Run ./install.sh full to install it.'
+  print -u2 'OpenUsage was not found. Run ./install.sh to install it.'
   exit 1
 fi
 if [[ $mode == full && -z $app ]]; then

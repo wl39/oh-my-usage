@@ -4,28 +4,17 @@ import base64
 import fcntl
 import json
 import os
-import tempfile
 import time
 from pathlib import Path
 
 from . import settings, source
+from .files import atomic_write
 from .render import render
 
 
 def directory():
     return Path(os.environ.get("OH_MY_USAGE_CACHE_DIR",
                 str(Path.home() / "Library/Caches/oh-my-usage"))).expanduser()
-
-
-def atomic_write(path, text):
-    fd, name = tempfile.mkstemp(prefix=".oh-my-usage-", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as stream:
-            stream.write(text)
-        os.replace(name, path)
-    finally:
-        if os.path.exists(name):
-            os.unlink(name)
 
 
 def display(root):

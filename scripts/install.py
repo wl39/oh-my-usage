@@ -82,10 +82,13 @@ def install(prefix, home, shell=True):
         quoted = shlex.quote(str(prefix / "oh-my-usage.plugin.zsh"))
         write_shell(rc, f"{START}\n[[ -r {quoted} ]] && source {quoted}\n{END}\n")
     print(f"Installed: {prefix}")
-    print("In your existing iTerm2 profile: Settings > Profiles > Session > Configure Status Bar.")
-    print(r"Enable the status bar, add Interpolated String, and set String Value to: \(user.oh_my_usage)")
-    print("Activate this shell: source " + shlex.quote(str(prefix / "oh-my-usage.plugin.zsh")))
-    print("Optional empty-input prompt: oh-my-usage inline on (disable with: oh-my-usage inline off)")
+    if shell or previous.get("shell"):
+        print("Open a new zsh tab, then run: oh-my-usage start")
+    else:
+        print("Load the plugin with your plugin manager, then run: oh-my-usage start")
+    print("Help: oh-my-usage")
+    print("Save inline display: oh-my-usage inline on (disable: oh-my-usage inline off)")
+    print(r"iTerm2 only, once: add an Interpolated String status component: \(user.oh_my_usage)")
 
 
 def uninstall(prefix):
@@ -116,6 +119,8 @@ def uninstall(prefix):
                               ("oh-my-usage", "oh-my-usage-unload", "oh_my_usage"))
     print(f"Removed {name}. Open a new shell, or run {unload} in this shell.")
     print(f"Remove the Interpolated String using \\(user.{variable}) from your status bar, if added.")
+    if not legacy:
+        print("Saved inline preferences are kept for reinstallation.")
 
 
 def main():

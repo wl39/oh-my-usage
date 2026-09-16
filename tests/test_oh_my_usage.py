@@ -299,7 +299,7 @@ class InstallTests(unittest.TestCase):
         self.prefix = self.home / "directory with spaces" / "oh_my_usage"
         self.rc = self.home / ".zshrc"
         self.rc.write_text("# existing user config\nplugins=(git)\n")
-        self.env = patch.dict(os.environ, {"ZDOTDIR": str(self.home)})
+        self.env = patch.dict(os.environ, {"ZDOTDIR": str(self.home), "OH_MY_USAGE_CONFIG_DIR": str(self.home / "config")})
         self.env.start()
         self.addCleanup(self.env.stop)
 
@@ -322,13 +322,13 @@ class InstallTests(unittest.TestCase):
                                 cwd=self.home, capture_output=True, text=True, timeout=5)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), __version__)
-        result = subprocess.run(["zsh", "-dfi", "-c",
-                                 'source "$PLUGIN"; oh-my-usage --version; oh-my-usage inline status'],
+        result = subprocess.run(["zsh", "-di", "-c",
+                                 'oh-my-usage --version; oh-my-usage inline status'],
                                 env=dict(os.environ, PLUGIN=str(self.prefix / "oh-my-usage.plugin.zsh"),
                                          OH_MY_USAGE_INLINE="off", OH_MY_USAGE_DISPLAY="off"),
                                 cwd=self.home, capture_output=True, text=True, timeout=5)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, __version__ + "\ninline: off\n")
+        self.assertEqual(result.stdout, __version__ + "\ninline: off (environment)\n")
         self.assertEqual({p.name for p in (self.prefix / "docs").iterdir()},
                          {"README.ko.md", "README.zh-CN.md"})
         self.assertFalse((self.prefix / "scripts/check.sh").exists())
@@ -469,20 +469,20 @@ _oh_my_usage_emit U0hPVUxELU5PVC1TSF9PVw==
                                      capture_output=True, text=True)
             self.assertNotEqual(missing.returncode, 0)
             self.assertFalse(log.exists())
-            for script in ("install-full.sh", "install-existing.sh"):
+            for script in ("install.sh", "install-full.sh", "install-existing.sh"):
                 result = subprocess.run([str(ROOT / script), *args], env=env,
                                         capture_output=True, text=True, timeout=10)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             calls = log.read_text()
             self.assertEqual(calls.count("install --cask"), 1)
-            self.assertEqual(calls.count("open "), 2)
+            self.assertEqual(calls.count("open "), 3)
             self.assertTrue((prefix / "oh-my-usage.plugin.zsh").exists())
             self.assertTrue((prefix / "zsh/inline.zsh").exists())
 
     def run_pty(self, script, root, **extra):
         master, slave = pty.openpty()
         env = dict(os.environ, PLUGIN=str(ROOT / "oh-my-usage.plugin.zsh"),
-                   OH_MY_USAGE_CACHE_DIR=str(root), TERM_PROGRAM="iTerm.app", TMUX="", STY="")
+                   OH_MY_USAGE_CACHE_DIR=str(root), OH_MY_USAGE_CONFIG_DIR=str(root / "config"), TERM_PROGRAM="iTerm.app", TMUX="", STY="")
         env.update(extra)
         try:
             result = subprocess.run(["zsh", "-dfi", "-c", script], env=env, cwd=root,
@@ -544,6 +544,24 @@ zselect -t 5
             self.assertEqual(self.run_pty(script, root),
                              b"\x1b]1337;SetUserVar=oh_my_usage=Q2xhdWRlIDQyJQ==\x07")
 
+    def test_start_publishes_immediately_and_reenables_this_shell(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "bin").mkdir()
+            executable = root / "bin/oh-my-usage"
+            executable.write_text('#!/bin/zsh\n[[ $1 == start ]] || exit 2\n'
+                                  'print -rl -- "$EPOCHSECONDS" "Ready" UmVhZHk= > "$OH_MY_USAGE_CACHE_DIR/display"\n')
+            executable.chmod(0o755)
+            script = r'''
+OH_MY_USAGE_DISPLAY=off
+source "$PLUGIN"
+_OH_MY_USAGE_ROOT=$OH_MY_USAGE_CACHE_DIR
+oh-my-usage start
+[[ $OH_MY_USAGE_DISPLAY == status && $OH_MY_USAGE_TEXT == Ready ]]
+'''
+            self.assertEqual(self.run_pty(script, root),
+                             b"\x1b]1337;SetUserVar=oh_my_usage=UmVhZHk=\x07")
+
     def test_no_refresh_or_status_output_in_other_terminals_with_inline_off(self):
         script = r'''
 source "$PLUGIN"
@@ -582,7 +600,7 @@ _OH_MY_USAGE_LOADED=1
 RPROMPT='old usage + theme'
 oh-my-usage-unload() { RPROMPT=theme; unset _OH_MY_USAGE_LOADED; }
 source "$PLUGIN"
-[[ $RPROMPT == theme && $_OH_MY_USAGE_VERSION == 0.4.0 ]]
+[[ $RPROMPT == theme && $_OH_MY_USAGE_VERSION == 0.5.0 ]]
 '''
         with tempfile.TemporaryDirectory() as temp:
             self.assertEqual(self.run_pty(script, Path(temp)), b"")

@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.coverage
+dist/
+
+# Local study notes, session records, and generated previews.
+/docs/study-*.md
+/docs/validation.md
+/docs/preview/
+/docs/private/
+/.codex/
+/.idea/
+/.vscode/
+.env
+.env.*
+*.log
+*.oh-my-usage-backup-*
+*.ouiterm-backup-*
+/python-path
+/.oh-my-usage-install
+/.ouiterm-install

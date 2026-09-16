@@ -1,0 +1,10 @@
+#!/bin/zsh
+emulate -L zsh
+typeset root=${0:A:h:h}
+typeset python=${OH_MY_USAGE_PYTHON:-python3}
+if [[ -r "$root/python-path" && -z ${OH_MY_USAGE_PYTHON:-} ]]; then
+  python=$(<"$root/python-path")
+fi
+export PYTHONPATH="$root"
+export PYTHONDONTWRITEBYTECODE=1
+exec "$python" -m oh_my_usage "$@"

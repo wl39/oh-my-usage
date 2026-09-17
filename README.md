@@ -6,6 +6,21 @@ Your [OpenUsage](https://github.com/robinebers/openusage) metrics in the **iTerm
 
 **Best compatibility: Mac + zsh + iTerm2.** Requires macOS 15+, Python 3.9+, and native OpenUsage (verified against 0.7.6). Oh My Zsh is optional. Other terminal apps and phone SSH clients can display the inline hint when connected to the same Mac account.
 
+## Demo
+
+![Inline usage disappears while typing, returns when input is cleared, and supports remaining allowance, provider order, and color settings](docs/assets/inline-demo.gif)
+
+Actual zsh output rendered with **sample data**: first-prompt display, hide while typing, then saved meter, order, and color changes. This demo shows the optional inline display; the iTerm2 status bar is configured separately below. [Terminal recording](docs/assets/inline-demo.cast) (replay with `asciinema play docs/assets/inline-demo.cast` from the repository if asciinema is installed).
+
+<details>
+<summary>Settings menu — oh-my-usage config</summary>
+
+![Settings menu with inline enabled, remaining allowance, Claude before Codex, and a muted cyan color](docs/assets/settings.png)
+
+Choose a number to change a setting. Changes save immediately and apply to future sessions.
+
+</details>
+
 ## Install → open a new tab → start
 
 ```zsh
@@ -194,5 +209,7 @@ Python standard library + zsh; no pip dependencies, extra daemon, or periodic ti
 The reader requests only `http://127.0.0.1:6736/v1/usage`; it does not read credentials, keychain entries, or conversation logs. Cache/settings files are private to the user. Selected stars and text/bars modes are reflected; order and Used/Left follow OpenUsage unless overridden in `config`; up to two metrics per provider, or four total in bars mode. Menu-bar icons/colors/screen-sharing detection are not reproduced. The [legacy UI API](https://github.com/robinebers/openusage/blob/main/docs/local-http-api.md) and upstream settings can change.
 
 Run `./scripts/check.sh` for syntax checks, unit tests, and real zsh pseudo-terminal tests, including persistence across sessions. Phone behavior uses simulated terminal environments, not automated iPhone UI tests. Modules separate config (`config.py`, `zsh/config.zsh`), startup (`start.py`), data/settings/rendering/cache, CLI, shell transport, and inline display. Personal notes and previews are excluded from Git and installation.
+
+README media can be regenerated on macOS with `scripts/record_demo.py`; its docstring lists the optional development dependencies. It uses an isolated zsh session with sample data. The media generator and assets are excluded from installation.
 
 [MIT license](LICENSE). Independent of the OpenUsage, iTerm2, and Oh My Zsh projects.

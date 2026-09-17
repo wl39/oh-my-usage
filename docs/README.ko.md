@@ -6,6 +6,21 @@
 
 **Mac + zsh + iTerm2 환경에서 가장 호환성이 좋습니다.** macOS 15+, Python 3.9+, 네이티브 OpenUsage가 필요합니다(0.7.6 기준 검증). Oh My Zsh는 선택 사항입니다. 다른 터미널과 휴대폰 SSH 앱에서도 같은 Mac 계정에 접속하면 내부 표시를 사용할 수 있습니다.
 
+## 데모
+
+![입력하면 숨겨지고 지우면 다시 나타나는 사용량 표시와 남은 양·순서·색상 설정](assets/inline-demo.gif)
+
+**예시 데이터로 실제 zsh 출력을 녹화해 만든 이미지**입니다. 첫 프롬프트 표시, 입력 중 숨김, 남은 양·순서·색상 저장을 보여줍니다. 데모는 선택 기능인 터미널 내부 표시이며, iTerm2 상태바 설정은 아래에서 안내합니다. [터미널 녹화 원본](assets/inline-demo.cast)은 asciinema가 설치되어 있으면 저장소에서 `asciinema play docs/assets/inline-demo.cast`로 재생할 수 있습니다.
+
+<details>
+<summary>설정 메뉴 보기 — oh-my-usage config</summary>
+
+![내부 표시 켜짐, 남은 양, Claude 다음 Codex, 옅은 청록색으로 저장된 설정 메뉴](assets/settings.png)
+
+번호를 선택해 설정을 바꿉니다. 변경 즉시 저장되며 이후 세션에도 적용됩니다.
+
+</details>
+
 ## 설치 → 새 탭 → 실행
 
 ```zsh
@@ -194,5 +209,7 @@ Python 표준 라이브러리와 zsh만 사용합니다. pip 의존성·추가 �
 조회기는 `http://127.0.0.1:6736/v1/usage`에만 요청하며 인증 정보·키체인·대화 로그를 읽지 않습니다. 캐시·설정 파일은 사용자 전용 권한으로 저장합니다. 별 선택·텍스트/막대 모드를 반영하며, 순서·Used/Left는 `config`에 저장한 값이 없으면 OpenUsage를 따릅니다. 제공자당 최대 두 지표, 막대는 전체 최대 네 지표입니다. 메뉴바 아이콘·색상·화면 공유 감지는 재현하지 않습니다. [legacy UI API](https://github.com/robinebers/openusage/blob/main/docs/local-http-api.md)와 상위 설정 형식은 바뀔 수 있습니다.
 
 `./scripts/check.sh`로 문법·단위 테스트와 실제 zsh 가상 터미널 테스트를 실행합니다. 세션 간 설정 유지도 검증합니다. 휴대폰 동작은 터미널 환경 재현이며 실제 아이폰 UI 자동 테스트는 아닙니다. 설정(`config.py`, `zsh/config.zsh`), 앱 시작(`start.py`), 데이터·표시 설정·렌더링·캐시, CLI, 셸 전송, 내부 표시를 모듈로 분리했습니다. 개인 노트·미리보기는 Git과 설치에서 제외합니다.
+
+README 이미지는 macOS에서 `scripts/record_demo.py`로 다시 만들 수 있습니다. 필요한 개발용 패키지는 파일 상단에 안내되어 있으며, 예시 데이터를 넣은 독립 zsh 세션을 사용합니다. 이미지 생성 도구와 이미지 파일은 프로그램 설치에서 제외됩니다.
 
 [MIT 라이선스](../LICENSE). OpenUsage·iTerm2·Oh My Zsh의 공식 제품이 아닌 독립 프로젝트입니다.

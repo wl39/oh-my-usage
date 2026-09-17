@@ -6,6 +6,21 @@
 
 **Mac + zsh + iTerm2 是兼容性最好的组合。** 需要 macOS 15+、Python 3.9+ 和原生 OpenUsage（已基于 0.7.6 验证）。Oh My Zsh 可选。其他终端和手机 SSH 客户端连接到同一 Mac 账户后，也能使用终端内显示。
 
+## 演示
+
+![输入时隐藏、清空后恢复的用量提示，以及剩余额度、服务顺序和颜色设置](assets/inline-demo.gif)
+
+使用**示例数据录制并渲染的真实 zsh 输出**，展示首个提示符显示、输入时隐藏，以及保存剩余额度、顺序和颜色设置。演示的是可选的终端内显示，iTerm2 状态栏需按下方说明单独配置。[终端录制文件](assets/inline-demo.cast)：如已安装 asciinema，可在仓库中运行 `asciinema play docs/assets/inline-demo.cast` 回放。
+
+<details>
+<summary>查看设置菜单 — oh-my-usage config</summary>
+
+![设置菜单：开启终端内显示、显示剩余额度、Claude 排在 Codex 前、使用柔和的青色](assets/settings.png)
+
+输入编号修改设置。更改立即保存，并在以后的会话中生效。
+
+</details>
+
 ## 安装 → 打开新标签页 → 启动
 
 ```zsh
@@ -194,5 +209,7 @@ ln -s "$HOME/.local/share/oh-my-usage" \
 读取程序只请求 `http://127.0.0.1:6736/v1/usage`，不读取凭据、钥匙串条目或对话日志。缓存和设置文件仅当前用户可访问。显示遵循星标和文字/条形模式；顺序和 Used/Left 在没有 `config` 覆盖时跟随 OpenUsage；每个服务最多两个指标，条形模式总计最多四个。菜单栏图标、颜色和屏幕共享检测不会复现。[legacy UI API](https://github.com/robinebers/openusage/blob/main/docs/local-http-api.md) 和上游设置格式可能变化。
 
 运行 `./scripts/check.sh` 可检查语法并执行单元测试和真实 zsh 伪终端测试，包括跨会话设置保留。手机行为通过终端环境模拟验证，并非自动化 iPhone 界面测试。配置（`config.py`、`zsh/config.zsh`）、启动（`start.py`）、数据/显示设置/渲染/缓存、CLI、shell 传输和终端内显示分别由独立模块负责。个人笔记和预览不会进入 Git 或安装文件。
+
+可在 macOS 上使用 `scripts/record_demo.py` 重新生成 README 图片；文件开头列出了可选的开发依赖。录制使用带有示例数据的独立 zsh 会话。图片生成工具和图片文件均不会随程序安装。
 
 [MIT 许可证](../LICENSE)。本项目独立于 OpenUsage、iTerm2 和 Oh My Zsh。

@@ -1,11 +1,11 @@
 # iTerm2 status-bar transport, with an optional empty-input right prompt.
 [[ -o interactive ]] || return 0
 if (( ${+_OH_MY_USAGE_LOADED} )); then
-  [[ ${_OH_MY_USAGE_VERSION:-} == 0.5.0 ]] && return 0
+  [[ ${_OH_MY_USAGE_VERSION:-} == 0.5.1 ]] && return 0
   # Restore the theme before replacing a previously loaded version.
   (( ${+functions[oh-my-usage-unload]} )) && oh-my-usage-unload
 fi
-typeset -g _OH_MY_USAGE_LOADED=1 _OH_MY_USAGE_VERSION=0.5.0
+typeset -g _OH_MY_USAGE_LOADED=1 _OH_MY_USAGE_VERSION=0.5.1
 typeset -g _OH_MY_USAGE_ROOT=${${(%):-%x}:A:h}
 typeset -g _OH_MY_USAGE_CACHE=${OH_MY_USAGE_CACHE_DIR:-$HOME/Library/Caches/oh-my-usage}
 typeset -g _OH_MY_USAGE_CONFIG=${OH_MY_USAGE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/oh-my-usage}

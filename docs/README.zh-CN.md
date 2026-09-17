@@ -1,4 +1,4 @@
-# oh-my-usage · v0.5.0
+# oh-my-usage · v0.5.1
 
 **[English](../README.md) · [简体中文](README.zh-CN.md) · [한국어](README.ko.md)**
 
@@ -25,6 +25,8 @@ oh-my-usage start
 此命令会在不抢占焦点的情况下打开 OpenUsage，读取用量并更新显示。普通安装无需手动 `source`、配置 PATH 或编辑 `.zshrc`。以后新标签页会自动加载集成，需要重新打开应用或刷新时运行 `start` 即可。
 
 > 安装程序是独立进程，不能直接向已经打开的 shell 添加命令，所以安装后需要打开一次新标签页。iTerm2 状态栏还需完成下方的一次性组件设置。终端内显示不需要状态栏设置。
+
+安装说明和帮助在终端中使用柔和的颜色区分内容。重定向到文件或管道时输出纯文本。设置 `NO_COLOR=1` 可关闭颜色，`TERM=dumb` 环境也不会使用颜色。
 
 ## 常用命令
 
@@ -75,7 +77,7 @@ oh-my-usage inline on
 
 Mac 负责读取用量，客户端负责显示提示符。手机无需安装 iTerm2，也无需开放 API 端口、设置端口转发或伪造 `TERM_PROGRAM`。如果之前在 Termius 中强制设置了 `TERM_PROGRAM=iTerm.app`，请删除该赋值。连接其他主机时不会自动获得原 Mac 的用量。Windows、Linux 和手机可作为 SSH 客户端，但不支持作为数据读取主机。不支持 Bash、Fish、PowerShell 或旧版 Tauri OpenUsage。
 
-## 更新到 v0.5.0
+## 更新到 v0.5.1
 
 在克隆的仓库目录中运行：
 

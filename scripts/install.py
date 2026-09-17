@@ -9,6 +9,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from oh_my_usage.terminal import installed_screen
+
 ROOT = Path(__file__).resolve().parent.parent
 START = "# >>> oh-my-usage >>>"
 END = "# <<< oh-my-usage <<<"
@@ -81,14 +83,7 @@ def install(prefix, home, shell=True):
     if shell:
         quoted = shlex.quote(str(prefix / "oh-my-usage.plugin.zsh"))
         write_shell(rc, f"{START}\n[[ -r {quoted} ]] && source {quoted}\n{END}\n")
-    print(f"Installed: {prefix}")
-    if shell or previous.get("shell"):
-        print("Open a new zsh tab, then run: oh-my-usage start")
-    else:
-        print("Load the plugin with your plugin manager, then run: oh-my-usage start")
-    print("Help: oh-my-usage")
-    print("Save inline display: oh-my-usage inline on (disable: oh-my-usage inline off)")
-    print(r"iTerm2 only, once: add an Interpolated String status component: \(user.oh_my_usage)")
+    installed_screen(prefix, shell or previous.get("shell", False))
 
 
 def uninstall(prefix):

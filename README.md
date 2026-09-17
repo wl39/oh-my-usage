@@ -1,4 +1,4 @@
-# oh-my-usage · v0.5.0
+# oh-my-usage · v0.5.1
 
 **[English](README.md) · [简体中文](docs/README.zh-CN.md) · [한국어](docs/README.ko.md)**
 
@@ -25,6 +25,8 @@ oh-my-usage start
 This opens OpenUsage without stealing focus, refreshes usage, and updates your display. No manual `source`, PATH setup, or `.zshrc` editing is needed with the normal installer. Future tabs load the integration automatically; `start` can reopen OpenUsage and refresh whenever needed.
 
 > The installer runs as a separate process, so an already-open shell needs a new tab to pick up the command. The iTerm2 status bar also needs the one-time component setup below. Inline display needs no status bar setup.
+
+Help and installation instructions use subtle colors in a terminal. Redirected output stays plain text. Set `NO_COLOR=1` to disable color; `TERM=dumb` is also respected.
 
 ## The commands you need
 
@@ -75,7 +77,7 @@ SSH into the same Mac account running OpenUsage, use zsh, and run `oh-my-usage i
 
 The Mac reads the usage; the client displays the prompt. No iTerm2 on the phone, API port forwarding, or `TERM_PROGRAM` spoofing is needed. If you previously forced `TERM_PROGRAM=iTerm.app` in Termius, remove that assignment. Other servers do not automatically receive this Mac's usage. Windows/Linux/phones are supported as SSH clients, not data-reader hosts. Bash/Fish/PowerShell and old Tauri OpenUsage are not supported.
 
-## Update to v0.5.0
+## Update to v0.5.1
 
 From your cloned repository:
 

@@ -66,7 +66,7 @@ if [[ -z $python ]] || ! "$python" -c 'import sys; sys.exit(sys.version_info < (
   python="$("$brew_cmd" --prefix)/bin/python3"
 fi
 export PYTHONDONTWRITEBYTECODE=1
-"$python" "$root/scripts/install.py" "$mode" "${forwarded[@]}"
+PYTHONPATH="$root" "$python" "$root/scripts/install.py" "$mode" "${forwarded[@]}"
 if [[ $mode != uninstall ]]; then
   open "$app"
 fi

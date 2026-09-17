@@ -1,21 +1,77 @@
 import contextlib
+import fcntl
 import io
 import os
 from pathlib import Path
+import pty
+import re
+import select
+import struct
 import subprocess
 import sys
 import tempfile
+import termios
+import time
 import unittest
 from unittest.mock import patch
 
 from oh_my_usage import config
 from oh_my_usage.__main__ import main
 from oh_my_usage.start import start
+from oh_my_usage.terminal import installed_screen
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
 class CommandTests(unittest.TestCase):
+    def test_help_color_in_terminal_and_plain_output_when_redirected_or_disabled(self):
+        env = dict(os.environ, TERM="xterm-256color")
+        env.pop("NO_COLOR", None)
+        command = [sys.executable, "-m", "oh_my_usage", "help"]
+        plain = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, check=True).stdout
+        self.assertNotIn(b"\x1b", plain)
+        for extra, colored, width in (({}, True, 80), ({}, True, 40), ({"NO_COLOR": "1"}, False, 80),
+                                      ({"NO_COLOR": ""}, False, 80), ({"TERM": "dumb"}, False, 80)):
+            master, slave = pty.openpty()
+            process = None
+            try:
+                fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, width, 0, 0))
+                process = subprocess.Popen(command, cwd=ROOT, env=dict(env, **extra),
+                                           stdout=slave, stderr=slave)
+                output = b""
+                deadline = time.monotonic() + 5
+                while True:
+                    # Drain while the process writes: a PTY can have a small buffer.
+                    if select.select([master], [], [], 0.1)[0]:
+                        output += os.read(master, 8192)
+                    elif process.poll() is not None:
+                        break
+                    self.assertLess(time.monotonic(), deadline, "help output timed out")
+                self.assertEqual(process.wait(), 0, output)
+                self.assertEqual(b"\x1b[" in output, colored)
+                clean = re.sub(rb"\x1b\[[0-9;]*m", b"", output).replace(b"\r\n", b"\n")
+                if width == 80:
+                    self.assertEqual(clean, plain)
+                else:
+                    self.assertEqual(clean.split(), plain.split())
+                    self.assertTrue(all(len(line) <= width for line in clean.decode().splitlines()))
+            finally:
+                if process is not None and process.poll() is None:
+                    process.kill()
+                    process.wait()
+                os.close(master)
+                os.close(slave)
+
+    def test_install_help_explains_normal_and_manual_loading_without_colors_in_logs(self):
+        for shell in (True, False):
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                installed_screen(Path("/example/oh-my-usage"), shell)
+            text = output.getvalue()
+            self.assertNotIn("\x1b", text)
+            self.assertIn("oh-my-usage start", text)
+            self.assertIn("new zsh terminal tab" if shell else "plugin manager", text)
+
     def test_default_and_explicit_help_do_not_read_usage_or_write_settings(self):
         for args in ([], ["help"], ["--help"]):
             with self.subTest(args=args), patch("oh_my_usage.cache.refresh") as refresh, \

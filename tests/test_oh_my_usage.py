@@ -600,7 +600,7 @@ _OH_MY_USAGE_LOADED=1
 RPROMPT='old usage + theme'
 oh-my-usage-unload() { RPROMPT=theme; unset _OH_MY_USAGE_LOADED; }
 source "$PLUGIN"
-[[ $RPROMPT == theme && $_OH_MY_USAGE_VERSION == 0.5.0 ]]
+[[ $RPROMPT == theme && $_OH_MY_USAGE_VERSION == 0.5.1 ]]
 '''
         with tempfile.TemporaryDirectory() as temp:
             self.assertEqual(self.run_pty(script, Path(temp)), b"")

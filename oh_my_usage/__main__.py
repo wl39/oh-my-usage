@@ -1,26 +1,14 @@
-import argparse
 import http.client
 import plistlib
 import subprocess
 import sys
 
 from . import __version__, cache, config
+from .terminal import HelpParser
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(
-        prog="oh-my-usage", description="OpenUsage in your terminal. No additional daemon.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""Quick start (after installing, open a new zsh tab):
-  oh-my-usage start              Open OpenUsage and refresh the display
-  oh-my-usage inline on          Save inline display ON for future sessions
-  oh-my-usage inline off         Save inline display OFF for future sessions
-  oh-my-usage inline on --session  Enable only in this shell
-
-iTerm2 status bar (one-time setup): add Interpolated String with
-  \\(user.oh_my_usage)
-Inline works in other terminals and SSH into the same Mac account.
-Guide: https://github.com/wl39/oh-my-usage""")
+    parser = HelpParser(prog="oh-my-usage", description="OpenUsage in your terminal. No additional daemon.")
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command", metavar="command")
     commands.add_parser("help", help="show this help")

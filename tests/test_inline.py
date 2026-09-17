@@ -20,12 +20,14 @@ ROOT = Path(__file__).resolve().parent.parent
 
 class Editor:
     def __init__(self, root, *, enabled="on", subst=True, text="Codex 42%",
-                 term_program="iTerm.app", columns=240, ssh=False, extra_env=None):
+                 term_program="iTerm.app", columns=240, ssh=False, extra_env=None,
+                 startup=False, cold=False):
         self.root = root
         self.output = b""
         self.state = root / "state"
-        (root / "display").write_text(
-            f"{int(time.time())}\n{text}\n{base64.b64encode(text.encode()).decode()}\n")
+        if not cold:
+            (root / "display").write_text(
+                f"{int(time.time())}\n{text}\n{base64.b64encode(text.encode()).decode()}\n")
         (root / "setup.zsh").write_text(r'''
 PROMPT='test> '
 RPROMPT='theme'
@@ -47,8 +49,25 @@ _test_observe() {
 zle -N _test_observe
 bindkey '^X^T' _test_observe
 # Cached editing must never launch the Python reader.
-_oh_my_usage_refresh() { print unexpected-worker >> "$TEST_WORKER"; }
+_oh_my_usage_refresh() {
+  print worker >> "$TEST_WORKER"
+  [[ $TEST_COLD == 1 ]] || return 0
+  zmodload zsh/zselect
+  repeat 500; do
+    [[ -f "$OH_MY_USAGE_CACHE_DIR/release" ]] && break
+    zselect -t 1
+  done
+  print -rl -- "$EPOCHSECONDS" 'Codex 42%' Q29kZXggNDIl > "$OH_MY_USAGE_CACHE_DIR/display"
+}
+# Record completion without sending any keystroke that could trigger a redraw.
+functions[_test_async_ready]=$functions[_oh_my_usage_async_ready]
+_oh_my_usage_async_ready() {
+  _test_async_ready "$@"
+  print done > "$OH_MY_USAGE_CACHE_DIR/ready"
+}
 ''')
+        if startup:
+            (root / ".zshrc").write_text('source "$TEST_SETUP"\n')
         env = dict(os.environ, HOME=str(root), ZDOTDIR=str(root),
                    PLUGIN=str(ROOT / "oh-my-usage.plugin.zsh"),
                    OH_MY_USAGE_CACHE_DIR=str(root), OH_MY_USAGE_INLINE=enabled,
@@ -58,14 +77,25 @@ _oh_my_usage_refresh() { print unexpected-worker >> "$TEST_WORKER"; }
                    TERM_PROGRAM=term_program, TMUX="", STY="", OH_MY_USAGE_INLINE_WIDTH="",
                    SSH_CONNECTION="127.0.0.1 50000 127.0.0.1 22" if ssh else "",
                    TEST_SUBST="on" if subst else "off", TEST_STATE=str(self.state),
+                   TEST_COLD="1" if cold else "0",
                    TEST_WORKER=str(root / "worker"), TEST_SETUP=str(root / "setup.zsh"))
         env.update(extra_env or {})
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
             os.chdir(root)
-            os.execvpe("zsh", ["zsh", "-dfi"], env)
+            fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", 24, columns, 0, 0))
+            os.execvpe("zsh", ["zsh", "-di" if startup else "-dfi"], env)
         fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, columns, 0, 0))
-        self.send(b'source "$TEST_SETUP"\r')
+        if not startup:
+            self.send(b'source "$TEST_SETUP"\r')
+
+    def until(self, condition):
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            self.drain()
+            if condition():
+                return
+        raise AssertionError(f"Timed out without keyboard input: {self.output[-3000:]!r}")
 
     def send(self, data):
         os.write(self.fd, data)
@@ -119,6 +149,60 @@ class InlineTests(unittest.TestCase):
         editor = Editor(Path(temp.name), **options)
         self.addCleanup(editor.close)
         return editor
+
+    def test_first_prompt_shows_without_any_keystroke_with_or_without_cache(self):
+        for cold in (False, True):
+            for width, program in ((120, "iTerm.app"), (40, "Termius")):
+                with self.subTest(cold=cold, width=width):
+                    editor = self.editor(startup=True, cold=cold, columns=width, term_program=program)
+                    if cold:
+                        editor.until(lambda: b"test>" in editor.output and (editor.root / "worker").exists())
+                        self.assertNotIn(b"Codex 42%", editor.output)
+                        (editor.root / "release").touch()
+                    editor.until(lambda: b"\x1b[38;5;245mCodex 42%" in editor.output)
+                    state = editor.wait()
+                    self.assertEqual(state[0], "")
+                    self.assertEqual(b"\x1b]1337;" in editor.output, program == "iTerm.app")
+
+    def test_cold_completion_preserves_typing_and_closes_watcher(self):
+        editor = self.editor(startup=True, cold=True, term_program="Termius")
+        editor.until(lambda: b"test>" in editor.output and (editor.root / "worker").exists())
+        editor.send(b"typing")
+        editor.wait("typing", visible=False)
+        (editor.root / "release").touch()
+        editor.until(lambda: (editor.root / "ready").exists())
+        editor.wait("typing", visible=False)
+        self.assertNotIn(b"Codex 42%", editor.output)
+        editor.send(b"\x15")
+        editor.wait()
+        self.assertIn(b"Codex 42%", editor.output)
+        editor.command('[[ -z ${_OH_MY_USAGE_ASYNC_FD:-} ]] && print closed > "$HOME/closed"')
+        editor.until(lambda: (editor.root / "closed").exists())
+
+    def test_unload_during_cold_read_closes_watcher_and_keeps_editor_usable(self):
+        editor = self.editor(startup=True, cold=True, term_program="Termius")
+        editor.until(lambda: b"test>" in editor.output and (editor.root / "worker").exists())
+        editor.command('oh-my-usage-unload; zle -F -L > "$HOME/watchers"')
+        editor.wait(visible=False, active="0")
+        self.assertEqual((editor.root / "watchers").read_text(), "")
+        (editor.root / "release").touch()
+        editor.until(lambda: (editor.root / "display").exists())
+        self.assertNotIn(b"Codex 42%", editor.output)
+        editor.send(b"x")
+        editor.wait("x", visible=False, active="0")
+
+    def test_saved_color_wins_over_environment_and_reaches_new_tab(self):
+        with tempfile.TemporaryDirectory() as temp:
+            shared = {"OH_MY_USAGE_CONFIG_DIR": temp}
+            editor = self.editor(extra_env=shared)
+            editor.wait()
+            editor.command("oh-my-usage config color cyan")
+            editor.until(lambda: b"\x1b[38;5;109mCodex 42%" in editor.output)
+            fresh = self.editor(startup=True, extra_env=shared)
+            fresh.until(lambda: b"\x1b[38;5;109mCodex 42%" in fresh.output)
+            editor.command("oh-my-usage config color auto")
+            offset = len(editor.output)
+            editor.until(lambda: b"\x1b[38;5;245mCodex 42%" in editor.output[offset:])
 
     def test_typing_space_delete_paste_history_and_multiline(self):
         editor = self.editor()

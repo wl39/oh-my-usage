@@ -24,6 +24,46 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class CommandTests(unittest.TestCase):
+    def test_config_cli_saves_validated_values_and_rejects_invalid_ones(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"OH_MY_USAGE_CONFIG_DIR": temp}), \
+             patch("oh_my_usage.cache.refresh") as refresh, contextlib.redirect_stdout(io.StringIO()):
+            for name, value, saved in (("mode", "left", "left"), ("order", "Claude, Codex", "claude,codex"),
+                                        ("color", "cyan", "109")):
+                self.assertEqual(main(["config", name, value]), 0)
+                self.assertEqual(config.value(name), saved)
+                self.assertEqual((Path(temp) / name).stat().st_mode & 0o777, 0o600)
+            self.assertEqual(refresh.call_count, 2)
+            for name, value in (("mode", "remaining"), ("order", "claude,,codex"), ("order", "codex,codex"),
+                                ("color", "256"), ("color", "$(touch INJECTED)"), ("color", "-1")):
+                before = (Path(temp) / name).read_text()
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(main(["config", name, value]), 1)
+                self.assertEqual((Path(temp) / name).read_text(), before)
+            config.save_inline("on")
+            self.assertEqual(main(["config", "reset"]), 0)
+            self.assertEqual(config.inline(), ("on", "saved"))
+            self.assertEqual(config.view_key(), "auto|auto")
+            self.assertEqual(config.value("color"), "auto")
+
+    def test_config_menu_choices_cancellation_and_noninteractive_output(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"OH_MY_USAGE_CONFIG_DIR": temp}), \
+             patch("oh_my_usage.cache.refresh"), contextlib.redirect_stdout(io.StringIO()) as output:
+            with patch("sys.stdin.isatty", return_value=True), \
+                 patch("builtins.input", side_effect=["2", "2", "3", "1", "4", "2", "0"]):
+                self.assertEqual(main(["config"]), 0)
+            self.assertEqual(config.value("mode"), "left")
+            self.assertEqual(config.value("order"), "claude,codex")
+            self.assertEqual(config.value("color"), "109")
+            self.assertIn("Saved.", output.getvalue())
+            for inputs in (["2", "", "0"], ["3", "4", "", "0"], [KeyboardInterrupt()], [EOFError()]):
+                with patch("sys.stdin.isatty", return_value=True), patch("builtins.input", side_effect=inputs):
+                    self.assertEqual(main(["config"]), 0)
+                self.assertEqual(config.value("mode"), "left")
+                self.assertEqual(config.value("order"), "claude,codex")
+            with patch("sys.stdin.isatty", return_value=False), patch("builtins.input") as read:
+                self.assertEqual(main(["config"]), 0)
+                read.assert_not_called()
+
     def test_help_color_in_terminal_and_plain_output_when_redirected_or_disabled(self):
         env = dict(os.environ, TERM="xterm-256color")
         env.pop("NO_COLOR", None)

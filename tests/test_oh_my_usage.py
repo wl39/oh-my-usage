@@ -9,6 +9,7 @@ import pty
 import select
 import subprocess
 import tempfile
+import threading
 import time
 import unittest
 import sys
@@ -16,7 +17,7 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from oh_my_usage import __version__, cache, metrics, settings, source
+from oh_my_usage import __version__, cache, config, metrics, settings, source
 from oh_my_usage.diagnostics import doctor
 from oh_my_usage.render import render
 from scripts import install
@@ -132,6 +133,9 @@ class CacheTests(unittest.TestCase):
         self.preferences = Path(self.temp.name) / "preferences.plist"
         write_prefs(self.preferences)
         self.fetch = Mock(return_value=usage())
+        env = patch.dict(os.environ, {"OH_MY_USAGE_CONFIG_DIR": str(Path(self.temp.name) / "config")})
+        env.start()
+        self.addCleanup(env.stop)
 
     def refresh(self, **kw):
         return cache.refresh(root=self.root, preferences=self.preferences, fetch=self.fetch, **kw)
@@ -168,6 +172,42 @@ class CacheTests(unittest.TestCase):
         self.refresh(now=NOW + 29, force=True)
         self.assertEqual(self.fetch.call_count, 2)
 
+    def test_saved_mode_reformats_fresh_cache_without_fetch_or_extending_ttl(self):
+        self.refresh(now=NOW)
+        before = self.preferences.read_bytes()
+        config.save("mode", "left")
+        self.assertEqual(self.refresh(now=NOW + 1), "Codex Weekly 90%/Session 58% (left)")
+        self.assertEqual(self.fetch.call_count, 1)
+        self.assertEqual(cache.display(self.root)[0], NOW)
+        self.assertEqual(self.preferences.read_bytes(), before)
+        config.reset()
+        self.assertIn("(used)", self.refresh(now=NOW + 2))
+        self.assertEqual(self.fetch.call_count, 1)
+        self.refresh(now=NOW + 30)
+        self.assertEqual(self.fetch.call_count, 2)
+
+    def test_saved_order_keeps_other_enabled_providers_and_offline_marker(self):
+        providers = []
+        for name in ("codex", "claude", "other"):
+            provider = usage()[0]
+            provider.update(providerId=name, displayName=name.title())
+            providers.append(provider)
+        self.fetch.return_value = providers
+        write_prefs(self.preferences, replace(prefs(), enabled=("codex", "claude", "other"),
+                    providers=("codex", "other", "claude"),
+                    pins=("codex.session", "claude.session", "other.session")))
+        self.refresh(now=NOW)
+        config.save("order", "claude,codex")
+        text = self.refresh(now=NOW + 1)
+        self.assertLess(text.index("Claude"), text.index("Codex"))
+        self.assertLess(text.index("Codex"), text.index("Other"))
+        self.assertEqual(self.fetch.call_count, 1)
+        self.fetch.side_effect = OSError("offline")
+        self.refresh(now=NOW + 40)
+        config.save("mode", "left")
+        self.assertIn("(left) [offline]", self.refresh(now=NOW + 41))
+        self.assertEqual(self.fetch.call_count, 2)
+
     def test_clock_rollback_refreshes(self):
         self.refresh(now=NOW)
         self.refresh(now=NOW - 3600)
@@ -199,6 +239,22 @@ class CacheTests(unittest.TestCase):
             self.refresh(now=NOW + 40)
         self.assertEqual(self.fetch.call_count, 1)
 
+    def test_simultaneous_cold_read_waits_for_shared_first_display(self):
+        self.root.mkdir()
+        with (self.root / "lock").open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            def first_reader():
+                time.sleep(0.1)
+                (self.root / "display").write_text(f"{NOW}\nReady\nUmVhZHk=\nauto|auto\n")
+                fcntl.flock(lock, fcntl.LOCK_UN)
+            worker = threading.Thread(target=first_reader)
+            worker.start()
+            try:
+                self.assertEqual(self.refresh(now=NOW), "Ready")
+                self.fetch.assert_not_called()
+            finally:
+                worker.join()
+
     def test_corrupt_or_missing_settings_do_not_expose_all_providers(self):
         for body, reason in ((b"garbage", "unsupported settings format"),
                              (plistlib.dumps({}), "menu-bar settings not saved")):
@@ -208,7 +264,8 @@ class CacheTests(unittest.TestCase):
 
     def test_private_cache_and_shell_payload(self):
         text = self.refresh(now=NOW)
-        stamp, plain, encoded = (self.root / "display").read_text().splitlines()
+        stamp, plain, encoded, key = (self.root / "display").read_text().splitlines()
+        self.assertEqual(key, "auto|auto")
         self.assertEqual(plain, text)
         self.assertEqual(base64.b64decode(encoded).decode(), text)
         self.assertEqual(int(stamp), NOW)
@@ -600,7 +657,7 @@ _OH_MY_USAGE_LOADED=1
 RPROMPT='old usage + theme'
 oh-my-usage-unload() { RPROMPT=theme; unset _OH_MY_USAGE_LOADED; }
 source "$PLUGIN"
-[[ $RPROMPT == theme && $_OH_MY_USAGE_VERSION == 0.5.1 ]]
+[[ $RPROMPT == theme && $_OH_MY_USAGE_VERSION == 0.6.0 ]]
 '''
         with tempfile.TemporaryDirectory() as temp:
             self.assertEqual(self.run_pty(script, Path(temp)), b"")

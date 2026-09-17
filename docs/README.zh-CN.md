@@ -1,4 +1,4 @@
-# oh-my-usage · v0.5.1
+# oh-my-usage · v0.6.0
 
 **[English](../README.md) · [简体中文](README.zh-CN.md) · [한국어](README.ko.md)**
 
@@ -40,6 +40,7 @@ oh-my-usage start
 | `oh-my-usage inline on --session` | 仅在当前 shell 中开启 |
 | `oh-my-usage inline off --session` | 仅在当前 shell 中关闭 |
 | `oh-my-usage inline status` | 查看实际生效的设置及其来源 |
+| `oh-my-usage config` | 打开设置菜单 |
 | `oh-my-usage doctor` | 检查应用、设置和 API 连接 |
 
 只需运行所需的命令；`on` 和 `off` 是两种选择。运行 `oh-my-usage inline --help` 可查看该命令的帮助。
@@ -52,12 +53,37 @@ oh-my-usage inline on
 
 默认关闭。开启后，新标签页以及以后登录**同一账户的 SSH 会话**都会自动应用。已经打开的其他标签页会在下次显示提示符时读取新设置。`--session` 只影响当前 shell，不修改保存的值。不带该选项运行 `inline on/off` 会清除当前 shell 的临时覆盖，并保存新选择。
 
-- 只有输入完全为空时才显示淡灰色提示（颜色编号 `245`）。
+- 新标签页的第一个提示符会立即显示缓存；没有缓存时，读取完成后自动重绘当前行，无需按 Enter。
+- 只有输入完全为空时才显示提示，默认淡灰色（颜色编号 `245`）。
 - 输入文字、空格、粘贴内容、调出历史命令或多行续行时隐藏；清空输入后恢复。
 - 宽度达到 80 列时显示在右侧提示符旁；更窄时显示在输入行上方。过长内容以 `…` 截断。
 - 输入过程中，iTerm2 状态栏仍然显示。
 
 设置保存在 `~/.config/oh-my-usage/inline` 这个小文件中，不会修改 `.zshrc`。优先级为：**`--session` → 已保存的选择 → `OH_MY_USAGE_INLINE` → 关闭**。保存的选择也会优先于 v0.4 中添加的 `export OH_MY_USAGE_INLINE=...`。
+
+### 设置菜单：已用/剩余、顺序和颜色
+
+```zsh
+oh-my-usage config
+```
+
+输入编号并选择值即可立即保存。选择时按 Enter 取消，主菜单输入 `0` 退出。菜单包含终端内显示开关、**used（已用）/ left（剩余）**、**Claude → Codex / Codex → Claude**、自定义服务顺序，以及柔和的颜色预设和 256 色编号。
+
+也可以直接运行：
+
+```zsh
+oh-my-usage config mode left
+oh-my-usage config order claude,codex
+oh-my-usage config color cyan
+```
+
+- `mode used` 显示已用量，`mode left` 显示剩余额度，`mode auto` 跟随 OpenUsage。
+- `order claude,codex` 将 Claude 放在 Codex 前面，其余已启用的服务随后显示。不会启用服务或修改星标。`order auto` 恢复 OpenUsage 的顺序。
+- `color` 支持 `gray`、`cyan`、`green`、`blue`、`purple`、`yellow`、`red`、`white` 或 `0`–`255`。保存值优先于 `OH_MY_USAGE_INLINE_COLOR`；`color auto` 恢复环境变量或默认颜色。
+- **颜色仅应用于终端内显示。** iTerm2 状态栏颜色请在 Interpolated String 组件设置中修改。已用/剩余和顺序应用于两种显示。
+- `config show` 查看设置；`config reset` 重置模式、顺序和颜色，保留终端内显示开关。
+
+设置以小文件（`inline`、`mode`、`order`、`color`）保存在 `~/.config/oh-my-usage` 或自定义目录中。新标签页、SSH 会话和更新后仍然保留，不修改 OpenUsage 应用设置。其他已打开的标签页在下一个提示符生效。当前 shell 的 `inline --session` 覆盖仍然优先。缓存有效时，更改模式和顺序无需再次请求 API。
 
 ### iTerm2 状态栏：仅设置一次
 
@@ -77,7 +103,7 @@ oh-my-usage inline on
 
 Mac 负责读取用量，客户端负责显示提示符。手机无需安装 iTerm2，也无需开放 API 端口、设置端口转发或伪造 `TERM_PROGRAM`。如果之前在 Termius 中强制设置了 `TERM_PROGRAM=iTerm.app`，请删除该赋值。连接其他主机时不会自动获得原 Mac 的用量。Windows、Linux 和手机可作为 SSH 客户端，但不支持作为数据读取主机。不支持 Bash、Fish、PowerShell 或旧版 Tauri OpenUsage。
 
-## 更新到 v0.5.1
+## 更新到 v0.6.0
 
 在克隆的仓库目录中运行：
 
@@ -88,7 +114,7 @@ git pull --ff-only
 
 打开新标签页，再运行 `oh-my-usage start`。如果首次安装使用了自定义 `--prefix` 或 `--no-shell`，请保留相同选项。
 
-**本版本变化：** 自动选择安装模式、新增 `start`、默认执行和 `help` 显示帮助、`inline on/off` 持久保存，以及 `--session` 临时覆盖。v0.4 中不带参数会输出用量，现在会显示帮助；脚本应改用 `oh-my-usage show`。保存的设置在更新和重新安装后仍然保留。
+**v0.6.0 更新：** 修复首次显示需要按 Enter 的问题，新增 `config` 菜单，可保存模式、服务顺序和颜色。旧设置在更新后保留。不带参数仍显示帮助，脚本请使用 `show`。
 
 ## 常见问题
 
@@ -155,17 +181,17 @@ ln -s "$HOME/.local/share/oh-my-usage" \
 ~/.local/share/oh-my-usage/install.sh uninstall
 ```
 
-卸载会移除安装文件、带标记的 shell 配置块和本工具的缓存。OpenUsage、Python、其他状态栏组件、备份及保存的 inline 设置会保留。关闭旧 shell 或运行 `oh-my-usage-unload`，并删除 Interpolated String 及手动添加的 Oh My Zsh 插件项/链接。自定义安装请使用对应目录中的 `install.sh uninstall`。
+卸载会移除安装文件、带标记的 shell 配置块和本工具的缓存。OpenUsage、Python、其他状态栏组件、备份及保存的设置会保留。关闭旧 shell 或运行 `oh-my-usage-unload`，并删除 Interpolated String 及手动添加的 Oh My Zsh 插件项/链接。自定义安装请使用对应目录中的 `install.sh uninstall`。
 
-若要同时清除保存的选择，只删除 `~/.config/oh-my-usage/inline` 文件即可；自定义配置目录请删除其中的同名文件。之后会重新使用环境变量或默认值。
+若要同时清除偏好设置，请删除配置目录中的 `inline`、`mode`、`order`、`color` 文件。之后会重新使用环境变量或默认值。
 
 </details>
 
 ## 轻量设计与开发
 
-仅使用 Python 标准库和 zsh，没有 pip 依赖、额外常驻进程或轮询定时器。标签页共享缓存和锁，在显示新提示符之前检查刷新，不会在空闲或运行命令时持续读取。按键处理使用 zsh 内置功能，保存的偏好设置在提示符阶段读取。OpenUsage 应用本身需要单独运行。
+仅使用 Python 标准库和 zsh，没有 pip 依赖、额外常驻进程或轮询定时器。标签页共享缓存和锁，在显示新提示符之前检查刷新，不会在空闲或运行命令时持续读取。按键处理使用 zsh 内置功能，保存的偏好设置在提示符阶段读取。读取结束后通过一次性管道通知 ZLE 重绘首个提示符，随后关闭管道。OpenUsage 应用本身需要单独运行。
 
-读取程序只请求 `http://127.0.0.1:6736/v1/usage`，不读取凭据、钥匙串条目或对话日志。缓存和设置文件仅当前用户可访问。显示遵循星标、顺序、Used/Left 和文字/条形模式；每个服务最多两个指标，条形模式总计最多四个。菜单栏图标、颜色和屏幕共享检测不会复现。[legacy UI API](https://github.com/robinebers/openusage/blob/main/docs/local-http-api.md) 和上游设置格式可能变化。
+读取程序只请求 `http://127.0.0.1:6736/v1/usage`，不读取凭据、钥匙串条目或对话日志。缓存和设置文件仅当前用户可访问。显示遵循星标和文字/条形模式；顺序和 Used/Left 在没有 `config` 覆盖时跟随 OpenUsage；每个服务最多两个指标，条形模式总计最多四个。菜单栏图标、颜色和屏幕共享检测不会复现。[legacy UI API](https://github.com/robinebers/openusage/blob/main/docs/local-http-api.md) 和上游设置格式可能变化。
 
 运行 `./scripts/check.sh` 可检查语法并执行单元测试和真实 zsh 伪终端测试，包括跨会话设置保留。手机行为通过终端环境模拟验证，并非自动化 iPhone 界面测试。配置（`config.py`、`zsh/config.zsh`）、启动（`start.py`）、数据/显示设置/渲染/缓存、CLI、shell 传输和终端内显示分别由独立模块负责。个人笔记和预览不会进入 Git 或安装文件。
 

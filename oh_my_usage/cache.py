@@ -1,4 +1,4 @@
-"""One shared cache and nonblocking file lock for all terminal tabs."""
+"""One shared cache and file lock for all terminal tabs."""
 
 import base64
 import fcntl
@@ -7,7 +7,7 @@ import os
 import time
 from pathlib import Path
 
-from . import settings, source
+from . import config, settings, source
 from .files import atomic_write
 from .render import render
 
@@ -25,29 +25,50 @@ def display(root):
         return 0, "OpenUsage: waiting for first read"
 
 
+def view_key(root):
+    try:
+        lines = (root / "display").read_text(encoding="utf-8").splitlines()
+        return lines[3] if len(lines) > 3 else "auto|auto"
+    except (OSError, UnicodeError):
+        return "auto|auto"
+
+
 def refresh(force=False, interval=30, root=None, preferences=None, fetch=source.fetch, now=None):
     root = root or directory()
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
-    instant = time.time() if now is None else now
     # Keep this inode: deleting lock files can permit two concurrent lock holders.
     fd = os.open(root / "lock", os.O_RDWR | os.O_CREAT, 0o600)
     with os.fdopen(fd, "w") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            return display(root)[1]
+        deadline = time.monotonic() + 10
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                # With no cache yet, let the first reader finish. Otherwise a
+                # second new tab would receive EOF before there is text to draw.
+                if (root / "display").exists() or time.monotonic() >= deadline:
+                    return display(root)[1]
+                time.sleep(0.05)
+        instant = time.time() if now is None else now
         last, text = display(root)
-        if not force and 0 <= instant - last < interval:
+        fresh = not force and 0 <= instant - last < interval
+        key = config.view_key()
+        if fresh and key == view_key(root):
             return text
         try:
-            prefs = settings.load(preferences)
+            prefs = config.apply(settings.load(preferences))
         except settings.SettingsError as error:
             text = "OpenUsage: " + error.summary + "; run oh-my-usage doctor"
         else:
-            offline = False
+            # A presentation change can reuse a fresh snapshot without an HTTP call.
+            offline = fresh and text.endswith(" [offline]")
             try:
-                providers = fetch()
-                atomic_write(root / "usage.json", json.dumps(providers, ensure_ascii=False))
+                if fresh:
+                    providers = source.validate(json.loads((root / "usage.json").read_text()))
+                else:
+                    providers = fetch()
+                    atomic_write(root / "usage.json", json.dumps(providers, ensure_ascii=False))
             except (OSError, ValueError, source.http.client.HTTPException):
                 offline = True
                 try:
@@ -56,5 +77,6 @@ def refresh(force=False, interval=30, root=None, preferences=None, fetch=source.
                     providers = []
             text = render(providers, prefs, instant, offline)
         encoded = base64.b64encode(text.encode()).decode("ascii")
-        atomic_write(root / "display", f"{int(instant)}\n{text}\n{encoded}\n")
+        stamp = last if fresh else int(instant)
+        atomic_write(root / "display", f"{stamp}\n{text}\n{encoded}\n{key}\n")
         return text

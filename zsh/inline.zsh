@@ -79,7 +79,8 @@ _oh_my_usage_inline_update() {
   if [[ $_OH_MY_USAGE_INLINE_MODE == on && ${OH_MY_USAGE_DISPLAY:-status} != off &&
         $CONTEXT == start && -z $BUFFER && -z $PREBUFFER ]]; then
     if [[ $_OH_MY_USAGE_INLINE_VISIBLE == 0 || $_OH_MY_USAGE_INLINE_COLUMNS != $COLUMNS ]]; then
-      local stamp text=$OH_MY_USAGE_TEXT color=${OH_MY_USAGE_INLINE_COLOR:-245}
+      _oh_my_usage_color_load
+      local stamp text=$OH_MY_USAGE_TEXT color=$_OH_MY_USAGE_INLINE_COLOR
       local limit=$(( COLUMNS < 80 ? COLUMNS - 2 : COLUMNS / 2 ))
       local width=${OH_MY_USAGE_INLINE_WIDTH:-$limit}
       [[ $width == <-> && ${#width} -le 4 ]] || width=$limit
@@ -89,8 +90,6 @@ _oh_my_usage_inline_update() {
       if [[ -r "$_OH_MY_USAGE_CACHE/display" ]]; then
         { IFS= read -r stamp; IFS= read -r text; } < "$_OH_MY_USAGE_CACHE/display"
       fi
-      [[ $color == <-> && ${#color} -le 3 ]] || color=245
-      (( color <= 255 )) || color=245
       # Literal percent signs cannot introduce prompt formatting directives.
       _OH_MY_USAGE_INLINE_RENDERED=${text:+"%F{$color}%${width}>…>${text//\%/%%}%>>%f"}
       _OH_MY_USAGE_INLINE_VISIBLE=1

@@ -115,7 +115,7 @@ def uninstall(prefix):
     print(f"Removed {name}. Open a new shell, or run {unload} in this shell.")
     print(f"Remove the Interpolated String using \\(user.{variable}) from your status bar, if added.")
     if not legacy:
-        print("Saved inline preferences are kept for reinstallation.")
+        print("Saved preferences are kept for reinstallation.")
 
 
 def main():

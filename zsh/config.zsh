@@ -18,3 +18,21 @@ _oh_my_usage_inline_load() {
     _OH_MY_USAGE_INLINE_ORIGIN=session
   fi
 }
+
+_oh_my_usage_view_load() {
+  local mode=auto order=auto
+  [[ -r "$_OH_MY_USAGE_CONFIG/mode" ]] && IFS= read -r mode < "$_OH_MY_USAGE_CONFIG/mode"
+  [[ -r "$_OH_MY_USAGE_CONFIG/order" ]] && IFS= read -r order < "$_OH_MY_USAGE_CONFIG/order"
+  typeset -g _OH_MY_USAGE_VIEW_KEY="$mode|$order"
+}
+
+_oh_my_usage_color_load() {
+  local saved='' color=${OH_MY_USAGE_INLINE_COLOR:-245}
+  [[ -r "$_OH_MY_USAGE_CONFIG/color" ]] && IFS= read -r saved < "$_OH_MY_USAGE_CONFIG/color"
+  if [[ $saved == <-> && ${#saved} -le 3 ]] && (( saved <= 255 )); then
+    color=$saved
+  fi
+  [[ $color == <-> && ${#color} -le 3 ]] || color=245
+  (( color <= 255 )) || color=245
+  typeset -g _OH_MY_USAGE_INLINE_COLOR=$color
+}

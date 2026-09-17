@@ -1,4 +1,4 @@
-# oh-my-usage · v0.5.1
+# oh-my-usage · v0.6.0
 
 **[English](../README.md) · [简体中文](README.zh-CN.md) · [한국어](README.ko.md)**
 
@@ -40,6 +40,7 @@ OpenUsage를 포커스 이동 없이 열고, 사용량을 조회해 표시를 �
 | `oh-my-usage inline on --session` | 현재 셸에서만 켜기 |
 | `oh-my-usage inline off --session` | 현재 셸에서만 끄기 |
 | `oh-my-usage inline status` | 실제 적용된 값과 설정 출처 확인 |
+| `oh-my-usage config` | 설정 메뉴 열기 |
 | `oh-my-usage doctor` | 앱·설정·API 연결 진단 |
 
 필요한 명령 하나만 실행하세요. `on`과 `off`는 선택지입니다. 내부 표시 명령의 도움말은 `oh-my-usage inline --help`로 봅니다.
@@ -52,12 +53,37 @@ oh-my-usage inline on
 
 기본값은 꺼짐입니다. 한 번 켜면 새 탭과 이후 **같은 계정으로 접속하는 SSH 세션**에도 자동 적용됩니다. 이미 열린 다른 탭은 다음 프롬프트부터 변경값을 반영합니다. `--session`은 현재 셸만 바꾸고 저장값은 유지합니다. 플래그 없이 `inline on/off`를 실행하면 현재 셸의 임시 설정을 해제하고 새 값을 저장합니다.
 
-- 입력이 완전히 비어 있을 때만 옅은 회색(`245`)으로 표시합니다.
+- 새 탭의 첫 프롬프트에서 바로 표시합니다. 캐시가 없으면 최초 조회가 끝나는 즉시 같은 줄을 갱신하므로 Enter를 누를 필요가 없습니다.
+- 입력이 완전히 비어 있을 때만 기본적으로 옅은 회색(`245`)으로 표시합니다.
 - 문자·공백·붙여넣기·이전 명령·여러 줄 입력 중에는 숨깁니다. 전부 지우면 다시 표시합니다.
 - 화면이 80칸 이상이면 오른쪽 프롬프트 옆, 더 좁으면 입력줄 위에 표시합니다. 긴 내용은 `…`로 줄입니다.
 - 입력 중에도 iTerm2 상태바는 계속 표시됩니다.
 
 설정은 `.zshrc` 대신 `~/.config/oh-my-usage/inline` 파일 하나에 저장합니다. 우선순위는 **`--session` → 저장값 → `OH_MY_USAGE_INLINE` → 꺼짐**입니다. v0.4에서 넣었던 `export OH_MY_USAGE_INLINE=...`보다 새로 저장한 값이 우선합니다.
+
+### 설정 메뉴: 사용량·남은 양, 순서, 색상
+
+```zsh
+oh-my-usage config
+```
+
+번호를 고르고 값을 선택하면 바로 저장됩니다. 선택 도중 Enter는 취소, 첫 메뉴에서 `0`은 종료입니다. 내부 표시 켜기/끄기, **used(사용량) / left(남은 양)**, **Claude → Codex / Codex → Claude**, 직접 지정하는 제공자 순서, 옅은 색상 프리셋과 256색 번호를 선택할 수 있습니다.
+
+명령으로 바로 바꿔도 됩니다.
+
+```zsh
+oh-my-usage config mode left
+oh-my-usage config order claude,codex
+oh-my-usage config color cyan
+```
+
+- `mode used`: 사용량, `mode left`: 남은 양. `mode auto`는 OpenUsage 설정을 따릅니다.
+- `order claude,codex`: Claude 다음 Codex 순서. 나머지 활성 제공자는 뒤에 이어집니다. 제공자를 켜거나 별 선택을 바꾸지는 않습니다. `order auto`는 OpenUsage 순서로 돌아갑니다.
+- `color`: `gray`, `cyan`, `green`, `blue`, `purple`, `yellow`, `red`, `white` 또는 `0`~`255`. 저장 색상이 `OH_MY_USAGE_INLINE_COLOR`보다 우선하며, `color auto`로 환경 변수/기본 색상으로 돌아갑니다.
+- **색상은 터미널 내부 표시에 적용됩니다.** iTerm2 상태바 색상은 Interpolated String 컴포넌트 설정에서 바꿉니다. used/left와 순서는 두 표시 모두에 적용됩니다.
+- `config show`: 저장값 확인. `config reset`: 사용량 모드·순서·색상 초기화. 내부 표시 켜기/끄기는 유지합니다.
+
+`~/.config/oh-my-usage` 또는 지정한 설정 폴더에 작은 파일(`inline`, `mode`, `order`, `color`)로 저장합니다. 새 탭·SSH 세션·업데이트 후에도 유지되며 OpenUsage 앱 설정은 바꾸지 않습니다. 다른 열린 탭은 다음 프롬프트부터 반영합니다. `inline --session`으로 지정한 값은 해당 셸에서 계속 우선합니다. 유효한 캐시가 있으면 API 재조회 없이 모드와 순서를 바꿉니다.
 
 ### iTerm2 상태바: 최초 한 번 설정
 
@@ -77,7 +103,7 @@ OpenUsage가 실행 중인 같은 Mac 계정에 SSH로 접속한 뒤, zsh에서 
 
 데이터는 Mac이 읽고, 접속한 기기는 화면을 표시합니다. 아이폰에 iTerm2를 설치하거나 API 포트를 열거나 `TERM_PROGRAM`을 꾸밀 필요가 없습니다. 이전에 Termius에서 `TERM_PROGRAM=iTerm.app`을 강제로 설정했다면 해당 줄을 지우세요. 다른 서버에 원래 Mac의 사용량이 자동 전달되지는 않습니다. Windows·Linux·휴대폰은 SSH 클라이언트로 사용할 수 있지만 데이터 조회 호스트는 지원하지 않습니다. Bash·Fish·PowerShell 및 구 Tauri OpenUsage도 지원하지 않습니다.
 
-## v0.5.1으로 업데이트
+## v0.6.0으로 업데이트
 
 내려받은 저장소 폴더에서 실행합니다.
 
@@ -88,7 +114,7 @@ git pull --ff-only
 
 새 탭을 열고 `oh-my-usage start`를 실행합니다. 처음에 사용자 지정 `--prefix`나 `--no-shell`을 썼다면 같은 옵션을 붙이세요.
 
-**이번 버전 변경:** 설치 모드 자동 선택, `start`, 기본 실행·`help` 도움말, `inline on/off` 저장, `--session` 임시 설정을 추가했습니다. v0.4에서는 인자 없이 사용량을 출력했지만 이제 도움말을 표시합니다. 사용량을 읽는 스크립트는 `oh-my-usage show`를 사용하세요. 저장한 설정은 업데이트·재설치 후에도 유지됩니다.
+**v0.6.0 변경:** 첫 내부 표시에 Enter가 필요하던 문제를 수정하고, `config` 메뉴에 사용량/남은 양·제공자 순서·색상 저장을 추가했습니다. 기존 설정은 업데이트 후에도 유지됩니다. 인자 없는 `oh-my-usage`는 도움말이며, 스크립트는 `show`를 사용합니다.
 
 ## 문제 해결
 
@@ -155,17 +181,17 @@ ln -s "$HOME/.local/share/oh-my-usage" \
 ~/.local/share/oh-my-usage/install.sh uninstall
 ```
 
-설치 파일·표시된 셸 블록·관리 대상 캐시를 제거합니다. OpenUsage·Python·다른 상태바 컴포넌트·백업·저장된 inline 설정은 유지합니다. 열린 셸을 닫거나 `oh-my-usage-unload`를 실행하고, Interpolated String 및 직접 추가한 Oh My Zsh 항목·링크를 제거하세요. 사용자 지정 설치는 해당 경로의 `install.sh uninstall`을 사용합니다.
+설치 파일·표시된 셸 블록·관리 대상 캐시를 제거합니다. OpenUsage·Python·다른 상태바 컴포넌트·백업·저장된 설정은 유지합니다. 열린 셸을 닫거나 `oh-my-usage-unload`를 실행하고, Interpolated String 및 직접 추가한 Oh My Zsh 항목·링크를 제거하세요. 사용자 지정 설치는 해당 경로의 `install.sh uninstall`을 사용합니다.
 
-저장값까지 초기화하려면 `~/.config/oh-my-usage/inline` 파일만 제거하세요. 폴더를 바꿨다면 해당 폴더의 파일을 제거합니다. 이후 환경 변수 또는 기본값이 적용됩니다.
+저장값까지 초기화하려면 설정 폴더의 `inline`, `mode`, `order`, `color` 파일을 제거하세요. 이후 환경 변수 또는 기본값이 적용됩니다.
 
 </details>
 
 ## 경량 구조와 개발
 
-Python 표준 라이브러리와 zsh만 사용합니다. pip 의존성·추가 상주 프로세스·주기적인 타이머가 없습니다. 탭끼리 캐시와 잠금을 공유합니다. 갱신 여부는 새 프롬프트 직전에 확인하며, 대기 중이거나 명령이 실행 중일 때 계속 조회하지 않습니다. 키 입력 처리는 zsh 내장 기능으로 처리하고 저장 설정은 프롬프트 시점에 읽습니다. OpenUsage 앱 자체는 별도로 실행되어야 합니다.
+Python 표준 라이브러리와 zsh만 사용합니다. pip 의존성·추가 상주 프로세스·주기적인 타이머가 없습니다. 탭끼리 캐시와 잠금을 공유합니다. 갱신 여부는 새 프롬프트 직전에 확인하며, 대기 중이거나 명령이 실행 중일 때 계속 조회하지 않습니다. 키 입력 처리는 zsh 내장 기능으로 처리하고 저장 설정은 프롬프트 시점에 읽습니다. 조회가 끝나면 일회성 파이프로 ZLE에 알려 첫 입력 줄을 다시 그린 뒤 파이프를 닫습니다. OpenUsage 앱 자체는 별도로 실행되어야 합니다.
 
-조회기는 `http://127.0.0.1:6736/v1/usage`에만 요청하며 인증 정보·키체인·대화 로그를 읽지 않습니다. 캐시·설정 파일은 사용자 전용 권한으로 저장합니다. 별 선택·순서·Used/Left·텍스트/막대 모드를 반영하며 제공자당 최대 두 지표, 막대는 전체 최대 네 지표입니다. 메뉴바 아이콘·색상·화면 공유 감지는 재현하지 않습니다. [legacy UI API](https://github.com/robinebers/openusage/blob/main/docs/local-http-api.md)와 상위 설정 형식은 바뀔 수 있습니다.
+조회기는 `http://127.0.0.1:6736/v1/usage`에만 요청하며 인증 정보·키체인·대화 로그를 읽지 않습니다. 캐시·설정 파일은 사용자 전용 권한으로 저장합니다. 별 선택·텍스트/막대 모드를 반영하며, 순서·Used/Left는 `config`에 저장한 값이 없으면 OpenUsage를 따릅니다. 제공자당 최대 두 지표, 막대는 전체 최대 네 지표입니다. 메뉴바 아이콘·색상·화면 공유 감지는 재현하지 않습니다. [legacy UI API](https://github.com/robinebers/openusage/blob/main/docs/local-http-api.md)와 상위 설정 형식은 바뀔 수 있습니다.
 
 `./scripts/check.sh`로 문법·단위 테스트와 실제 zsh 가상 터미널 테스트를 실행합니다. 세션 간 설정 유지도 검증합니다. 휴대폰 동작은 터미널 환경 재현이며 실제 아이폰 UI 자동 테스트는 아닙니다. 설정(`config.py`, `zsh/config.zsh`), 앱 시작(`start.py`), 데이터·표시 설정·렌더링·캐시, CLI, 셸 전송, 내부 표시를 모듈로 분리했습니다. 개인 노트·미리보기는 Git과 설치에서 제외합니다.
 

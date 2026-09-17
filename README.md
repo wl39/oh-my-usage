@@ -1,4 +1,4 @@
-# oh-my-usage · v0.5.1
+# oh-my-usage · v0.6.0
 
 **[English](README.md) · [简体中文](docs/README.zh-CN.md) · [한국어](docs/README.ko.md)**
 
@@ -40,6 +40,7 @@ Help and installation instructions use subtle colors in a terminal. Redirected o
 | `oh-my-usage inline on --session` | Enable only in this shell |
 | `oh-my-usage inline off --session` | Disable only in this shell |
 | `oh-my-usage inline status` | Show the effective setting and where it came from |
+| `oh-my-usage config` | Open the settings menu |
 | `oh-my-usage doctor` | Diagnose app, settings, and API access |
 
 Run only the command you need; `on` and `off` are alternatives. `oh-my-usage inline --help` shows help for that command.
@@ -52,12 +53,37 @@ oh-my-usage inline on
 
 The default is off. Once enabled, new tabs and later SSH sessions into the **same account** use it automatically. Already-open tabs pick up a changed setting at their next prompt. A `--session` override stays local to that shell and leaves the saved preference untouched. Running `inline on/off` without the flag clears the current shell's temporary override and saves the new choice.
 
-- Display appears only when input is completely empty, in muted gray (`245`).
+- The first prompt displays cached data immediately; if no cache exists, it redraws as soon as the read finishes. No Enter is needed.
+- Display appears only when input is completely empty, in muted gray (`245`) by default.
 - Typing, spaces, paste, history recall, and multiline continuations hide it. Clearing input restores it.
 - On screens at least 80 columns wide it appears beside the right prompt; narrower screens show it above the input line. Long text ends in `…`.
 - The iTerm2 status bar remains visible while typing.
 
 The setting is a tiny data file at `~/.config/oh-my-usage/inline`, not an edit to `.zshrc`. Priority: **`--session` → saved choice → `OH_MY_USAGE_INLINE` → off**. Saved choices also take precedence over old `export OH_MY_USAGE_INLINE=...` lines from v0.4.
+
+### Settings menu: meter, order, and color
+
+```zsh
+oh-my-usage config
+```
+
+Choose a number, then a value. Each change saves immediately; Enter cancels a choice, and `0` exits. The menu includes inline on/off, **used / left**, **Claude → Codex / Codex → Claude**, custom provider order, and muted color presets or a 256-color index.
+
+You can also set a single option directly:
+
+```zsh
+oh-my-usage config mode left
+oh-my-usage config order claude,codex
+oh-my-usage config color cyan
+```
+
+- `mode used` shows consumption; `mode left` shows remaining allowance. `mode auto` follows OpenUsage.
+- `order claude,codex` puts Claude first and Codex second. Other enabled providers follow; this does not enable providers or change starred metrics. `order auto` follows OpenUsage.
+- `color` accepts `gray`, `cyan`, `green`, `blue`, `purple`, `yellow`, `red`, `white`, or `0`–`255`. Saved colors override `OH_MY_USAGE_INLINE_COLOR`; `color auto` restores the environment/default color.
+- **Color applies to inline text.** For the iTerm2 status bar, set the text color in the Interpolated String component's configuration. Meter and order apply to both displays.
+- `config show` lists choices. `config reset` resets meter, order, and color; inline on/off stays unchanged.
+
+Preferences are small files (`inline`, `mode`, `order`, `color`) in `~/.config/oh-my-usage` (or your configured directory). They persist across new tabs, SSH sessions, and updates without changing OpenUsage's own settings. Other open tabs adopt changes at their next prompt. An inline `--session` override still takes priority in its shell. A fresh cached snapshot can be reformatted without another API request.
 
 ### iTerm2 status bar: one-time setup
 
@@ -77,7 +103,7 @@ SSH into the same Mac account running OpenUsage, use zsh, and run `oh-my-usage i
 
 The Mac reads the usage; the client displays the prompt. No iTerm2 on the phone, API port forwarding, or `TERM_PROGRAM` spoofing is needed. If you previously forced `TERM_PROGRAM=iTerm.app` in Termius, remove that assignment. Other servers do not automatically receive this Mac's usage. Windows/Linux/phones are supported as SSH clients, not data-reader hosts. Bash/Fish/PowerShell and old Tauri OpenUsage are not supported.
 
-## Update to v0.5.1
+## Update to v0.6.0
 
 From your cloned repository:
 
@@ -88,7 +114,7 @@ git pull --ff-only
 
 Open a new tab, then use `oh-my-usage start`. Reuse any custom `--prefix` or `--no-shell` option from your original install.
 
-**What changed:** automatic install-mode selection, `start`, default/help output, saved `inline on/off`, and temporary `--session` overrides. In v0.4, bare `oh-my-usage` printed usage; scripts should now use `oh-my-usage show`. Saved settings survive updates and reinstallation.
+**New in v0.6.0:** the first inline display no longer needs Enter, and `config` adds saved meter, provider order, and color choices. Existing settings survive updates. Bare `oh-my-usage` still shows help; use `show` in scripts.
 
 ## Troubleshooting
 
@@ -155,17 +181,17 @@ To uninstall:
 ~/.local/share/oh-my-usage/install.sh uninstall
 ```
 
-Installed files, the marked shell block, and owned cache files are removed. OpenUsage, Python, other status bar components, backups, and saved inline preferences are kept. Close old shells or run `oh-my-usage-unload`; remove the Interpolated String and any manually added Oh My Zsh entry/symlink. For a custom install, use its `install.sh uninstall`.
+Installed files, the marked shell block, and owned cache files are removed. OpenUsage, Python, other status bar components, backups, and saved preferences are kept. Close old shells or run `oh-my-usage-unload`; remove the Interpolated String and any manually added Oh My Zsh entry/symlink. For a custom install, use its `install.sh uninstall`.
 
-To discard the saved choice too, remove only `~/.config/oh-my-usage/inline` (or the file in your configured directory). The fallback then applies again.
+To discard saved preferences too, remove the `inline`, `mode`, `order`, and `color` files from your configuration directory. The defaults then apply again.
 
 </details>
 
 ## Lightweight design and development
 
-Python standard library + zsh; no pip dependencies, extra daemon, or periodic timer. Tabs share a cache and lock. A refresh check runs before a new prompt, not continuously while idle or running a command. Keypress handling uses zsh builtins, and saved preferences are read at prompt boundaries. OpenUsage itself must run separately.
+Python standard library + zsh; no pip dependencies, extra daemon, or periodic timer. Tabs share a cache and lock. A refresh check runs before a new prompt, not continuously while idle or running a command. Keypress handling uses zsh builtins, and saved preferences are read at prompt boundaries. A one-shot pipe notifies ZLE when a read finishes so the first prompt redraws without keyboard input; the pipe closes immediately afterward. OpenUsage itself must run separately.
 
-The reader requests only `http://127.0.0.1:6736/v1/usage`; it does not read credentials, keychain entries, or conversation logs. Cache/settings files are private to the user. Selected stars, order, Used/Left, and text/bars modes are reflected; up to two metrics per provider, or four total in bars mode. Menu-bar icons/colors/screen-sharing detection are not reproduced. The [legacy UI API](https://github.com/robinebers/openusage/blob/main/docs/local-http-api.md) and upstream settings can change.
+The reader requests only `http://127.0.0.1:6736/v1/usage`; it does not read credentials, keychain entries, or conversation logs. Cache/settings files are private to the user. Selected stars and text/bars modes are reflected; order and Used/Left follow OpenUsage unless overridden in `config`; up to two metrics per provider, or four total in bars mode. Menu-bar icons/colors/screen-sharing detection are not reproduced. The [legacy UI API](https://github.com/robinebers/openusage/blob/main/docs/local-http-api.md) and upstream settings can change.
 
 Run `./scripts/check.sh` for syntax checks, unit tests, and real zsh pseudo-terminal tests, including persistence across sessions. Phone behavior uses simulated terminal environments, not automated iPhone UI tests. Modules separate config (`config.py`, `zsh/config.zsh`), startup (`start.py`), data/settings/rendering/cache, CLI, shell transport, and inline display. Personal notes and previews are excluded from Git and installation.
 

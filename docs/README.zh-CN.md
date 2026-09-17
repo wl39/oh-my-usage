@@ -1,4 +1,4 @@
-# oh-my-usage · v0.6.0
+# oh-my-usage · v0.6.1
 
 **[English](../README.md) · [简体中文](README.zh-CN.md) · [한국어](README.ko.md)**
 
@@ -103,7 +103,7 @@ oh-my-usage config color cyan
 
 Mac 负责读取用量，客户端负责显示提示符。手机无需安装 iTerm2，也无需开放 API 端口、设置端口转发或伪造 `TERM_PROGRAM`。如果之前在 Termius 中强制设置了 `TERM_PROGRAM=iTerm.app`，请删除该赋值。连接其他主机时不会自动获得原 Mac 的用量。Windows、Linux 和手机可作为 SSH 客户端，但不支持作为数据读取主机。不支持 Bash、Fish、PowerShell 或旧版 Tauri OpenUsage。
 
-## 更新到 v0.6.0
+## 更新到 v0.6.1
 
 在克隆的仓库目录中运行：
 
@@ -114,7 +114,7 @@ git pull --ff-only
 
 打开新标签页，再运行 `oh-my-usage start`。如果首次安装使用了自定义 `--prefix` 或 `--no-shell`，请保留相同选项。
 
-**v0.6.0 更新：** 修复首次显示需要按 Enter 的问题，新增 `config` 菜单，可保存模式、服务顺序和颜色。旧设置在更新后保留。不带参数仍显示帮助，脚本请使用 `show`。
+**v0.6.1 更新：** 修复新 shell 尚未加载行编辑器、以及 agnoster 等未预先定义右侧提示符的主题中首次显示失败的问题。快速提示符恢复终端输出后也会应用显示。无需按 Enter、增加启动等待或常驻进程。v0.6 的设置菜单保持可用。
 
 ## 常见问题
 

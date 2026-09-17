@@ -1,4 +1,4 @@
-# oh-my-usage · v0.6.0
+# oh-my-usage · v0.6.1
 
 **[English](README.md) · [简体中文](docs/README.zh-CN.md) · [한국어](docs/README.ko.md)**
 
@@ -103,7 +103,7 @@ SSH into the same Mac account running OpenUsage, use zsh, and run `oh-my-usage i
 
 The Mac reads the usage; the client displays the prompt. No iTerm2 on the phone, API port forwarding, or `TERM_PROGRAM` spoofing is needed. If you previously forced `TERM_PROGRAM=iTerm.app` in Termius, remove that assignment. Other servers do not automatically receive this Mac's usage. Windows/Linux/phones are supported as SSH clients, not data-reader hosts. Bash/Fish/PowerShell and old Tauri OpenUsage are not supported.
 
-## Update to v0.6.0
+## Update to v0.6.1
 
 From your cloned repository:
 
@@ -114,7 +114,7 @@ git pull --ff-only
 
 Open a new tab, then use `oh-my-usage start`. Reuse any custom `--prefix` or `--no-shell` option from your original install.
 
-**New in v0.6.0:** the first inline display no longer needs Enter, and `config` adds saved meter, provider order, and color choices. Existing settings survive updates. Bare `oh-my-usage` still shows help; use `show` in scripts.
+**New in v0.6.1:** fixes the first prompt on fresh shells and themes with no existing right prompt, including agnoster. It also publishes after instant-prompt themes restore terminal output. No Enter, startup sleep, or resident process is required. The saved settings menu from v0.6 remains available.
 
 ## Troubleshooting
 

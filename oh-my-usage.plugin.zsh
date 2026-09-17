@@ -1,11 +1,11 @@
 # iTerm2 status-bar transport, with an optional empty-input right prompt.
 [[ -o interactive ]] || return 0
 if (( ${+_OH_MY_USAGE_LOADED} )); then
-  [[ ${_OH_MY_USAGE_VERSION:-} == 0.6.0 ]] && return 0
+  [[ ${_OH_MY_USAGE_VERSION:-} == 0.6.1 ]] && return 0
   # Restore the theme before replacing a previously loaded version.
   (( ${+functions[oh-my-usage-unload]} )) && oh-my-usage-unload
 fi
-typeset -g _OH_MY_USAGE_LOADED=1 _OH_MY_USAGE_VERSION=0.6.0
+typeset -g _OH_MY_USAGE_LOADED=1 _OH_MY_USAGE_VERSION=0.6.1
 typeset -g _OH_MY_USAGE_ROOT=${${(%):-%x}:A:h}
 typeset -g _OH_MY_USAGE_CACHE=${OH_MY_USAGE_CACHE_DIR:-$HOME/Library/Caches/oh-my-usage}
 typeset -g _OH_MY_USAGE_CONFIG=${OH_MY_USAGE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/oh-my-usage}
@@ -17,6 +17,7 @@ autoload -Uz add-zsh-hook
 source "$_OH_MY_USAGE_ROOT/zsh/config.zsh"
 source "$_OH_MY_USAGE_ROOT/zsh/inline.zsh"
 source "$_OH_MY_USAGE_ROOT/zsh/async.zsh"
+source "$_OH_MY_USAGE_ROOT/zsh/startup.zsh"
 
 oh-my-usage() {
   if [[ ${1:-} == inline ]]; then
@@ -97,6 +98,7 @@ _oh_my_usage_precmd() {
 
 oh-my-usage-unload() {
   add-zsh-hook -d precmd _oh_my_usage_precmd
+  _oh_my_usage_startup_close
   _oh_my_usage_async_close
   _oh_my_usage_inline_disable
   _oh_my_usage_emit ''
@@ -106,3 +108,4 @@ oh-my-usage-unload() {
 
 add-zsh-hook precmd _oh_my_usage_precmd
 _oh_my_usage_inline_sync
+_oh_my_usage_startup_schedule

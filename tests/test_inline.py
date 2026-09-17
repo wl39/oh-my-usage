@@ -21,7 +21,8 @@ ROOT = Path(__file__).resolve().parent.parent
 class Editor:
     def __init__(self, root, *, enabled="on", subst=True, text="Codex 42%",
                  term_program="iTerm.app", columns=240, ssh=False, extra_env=None,
-                 startup=False, cold=False):
+                 startup=False, cold=False, preload_editor=True, empty_right=False,
+                 dynamic_prompt=False, defer_tty=False):
         self.root = root
         self.output = b""
         self.state = root / "state"
@@ -29,18 +30,48 @@ class Editor:
             (root / "display").write_text(
                 f"{int(time.time())}\n{text}\n{base64.b64encode(text.encode()).decode()}\n")
         (root / "setup.zsh").write_text(r'''
+if [[ $TEST_DEFER_TTY == 1 ]]; then
+  exec {_TEST_STDOUT}>&1 1> "$HOME/startup-output"
+fi
 PROMPT='test> '
-RPROMPT='theme'
+if [[ $TEST_EMPTY_RIGHT != 1 ]]; then
+  RPROMPT='theme'
+elif (( ! ${+RPROMPT} )); then
+  print unset > "$HOME/right-prompt-was-unset"
+fi
+if [[ $TEST_DYNAMIC_PROMPT == 1 ]]; then
+  _test_prompt() { print -nr -- 'test> '; }
+  PROMPT='$(_test_prompt)'
+fi
 PS2='more> '
 HISTFILE=''
 HISTSIZE=20
-bindkey -e
-bindkey '^?' backward-delete-char
 [[ $TEST_SUBST == on ]] && setopt promptsubst || unsetopt promptsubst
 # Verify an existing editor hook still runs after oh-my-usage installs its own.
 _other_redraw() { (( ++_OTHER_CALLS )); return 0; }
-zle -N zle-line-pre-redraw _other_redraw
+if [[ $TEST_PRELOAD_EDITOR == 1 ]]; then
+  zle -N zle-line-pre-redraw _other_redraw
+else
+  zmodload -e zsh/zle || print unloaded > "$HOME/editor-was-unloaded"
+fi
 source "$PLUGIN"
+bindkey -e
+bindkey '^?' backward-delete-char
+if [[ $TEST_DEFER_TTY == 1 ]]; then
+  _test_restore_tty() {
+    exec 1>&$_TEST_STDOUT {_TEST_STDOUT}>&-
+    add-zsh-hook -d precmd _test_restore_tty
+  }
+  add-zsh-hook precmd _test_restore_tty
+fi
+# Observe the startup callback without causing any keyboard-driven repaint.
+if (( ${+functions[_oh_my_usage_startup_ready]} )); then
+  functions[_test_startup_ready]=$functions[_oh_my_usage_startup_ready]
+  _oh_my_usage_startup_ready() {
+    _test_startup_ready "$@"
+    print -r -- "${_OH_MY_USAGE_STARTUP_FD:-closed}" > "$HOME/startup-ready"
+  }
+fi
 _test_observe() {
   builtin printf '%s\0' "$BUFFER" "$RPROMPT" "$PREBUFFER" "$CONTEXT" \
     "${_OH_MY_USAGE_INLINE_ACTIVE:-0}" "$options[promptsubst]" "${_OTHER_CALLS:-0}" \
@@ -78,6 +109,10 @@ _oh_my_usage_async_ready() {
                    SSH_CONNECTION="127.0.0.1 50000 127.0.0.1 22" if ssh else "",
                    TEST_SUBST="on" if subst else "off", TEST_STATE=str(self.state),
                    TEST_COLD="1" if cold else "0",
+                   TEST_PRELOAD_EDITOR="1" if preload_editor else "0",
+                   TEST_EMPTY_RIGHT="1" if empty_right else "0",
+                   TEST_DYNAMIC_PROMPT="1" if dynamic_prompt else "0",
+                   TEST_DEFER_TTY="1" if defer_tty else "0",
                    TEST_WORKER=str(root / "worker"), TEST_SETUP=str(root / "setup.zsh"))
         env.update(extra_env or {})
         self.pid, self.fd = pty.fork()
@@ -149,6 +184,42 @@ class InlineTests(unittest.TestCase):
         editor = Editor(Path(temp.name), **options)
         self.addCleanup(editor.close)
         return editor
+
+    def test_fresh_shell_without_preloaded_editor_shows_first_prompt(self):
+        editor = self.editor(startup=True, preload_editor=False)
+        editor.until(lambda: b"\x1b[38;5;245mCodex 42%" in editor.output)
+        self.assertTrue((editor.root / "editor-was-unloaded").exists())
+        editor.until(lambda: (editor.root / "startup-ready").exists())
+        self.assertEqual((editor.root / "startup-ready").read_text(), "closed\n")
+        self.assertFalse((editor.root / "worker").exists())
+        editor.send(b"x")
+        editor.wait("x", visible=False)
+
+    def test_empty_right_prompt_with_dynamic_theme_shows_before_first_key(self):
+        editor = self.editor(startup=True, dynamic_prompt=True, empty_right=True)
+        editor.until(lambda: b"\x1b[38;5;245mCodex 42%" in editor.output)
+        self.assertTrue((editor.root / "right-prompt-was-unset").exists())
+        editor.send(b"x")
+        editor.wait("x", visible=False, theme="", left='$(_test_prompt)')
+        editor.send(b"\x7f")
+        editor.wait(theme="", left='$(_test_prompt)')
+        self.assertFalse((editor.root / "worker").exists())
+
+    def test_status_only_recovers_when_first_precmd_has_redirected_output(self):
+        editor = self.editor(startup=True, enabled="off", defer_tty=True, preload_editor=False)
+        editor.until(lambda: b"\x1b]1337;SetUserVar=oh_my_usage=Q29kZXggNDIl\x07" in editor.output)
+        editor.until(lambda: (editor.root / "startup-ready").exists())
+        self.assertEqual((editor.root / "startup-ready").read_text(), "closed\n")
+        self.assertNotIn(b"SetUserVar=oh_my_usage", (editor.root / "startup-output").read_bytes())
+        self.assertFalse((editor.root / "worker").exists())
+
+    def test_cold_read_starts_after_tty_is_restored_without_a_keypress(self):
+        editor = self.editor(startup=True, cold=True, defer_tty=True, preload_editor=False,
+                             dynamic_prompt=True, empty_right=True)
+        editor.until(lambda: b"test>" in editor.output and (editor.root / "worker").exists())
+        (editor.root / "release").touch()
+        editor.until(lambda: b"\x1b[38;5;245mCodex 42%" in editor.output)
+        self.assertEqual((editor.root / "worker").read_text().splitlines(), ["worker"])
 
     def test_first_prompt_shows_without_any_keystroke_with_or_without_cache(self):
         for cold in (False, True):

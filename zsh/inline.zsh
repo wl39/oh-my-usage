@@ -33,6 +33,11 @@ _oh_my_usage_inline_sync() {
   _oh_my_usage_inline_load
   if [[ $_OH_MY_USAGE_INLINE_MODE == on && ${OH_MY_USAGE_DISPLAY:-status} != off ]]; then
     [[ ${_OH_MY_USAGE_INLINE_ACTIVE:-0} == 1 ]] && return 0
+    # add-zle-hook-widget only checks for ZLE; it does not load it on a fresh shell.
+    zmodload zsh/zle || return 1
+    # Bind the right-prompt parameter before the first ZLE invocation. Creating
+    # it inside line-init is too late on shells whose theme never set RPROMPT.
+    typeset -g RPROMPT=${RPROMPT-${RPS1-}}
     typeset -g _OH_MY_USAGE_INLINE_ACTIVE=1 _OH_MY_USAGE_INLINE_VISIBLE=0
     typeset -g _OH_MY_USAGE_INLINE_BASE=$RPROMPT _OH_MY_USAGE_INLINE_APPLIED=$RPROMPT
     typeset -g _OH_MY_USAGE_INLINE_LEFT_BASE=$PROMPT _OH_MY_USAGE_INLINE_LEFT_APPLIED=$PROMPT

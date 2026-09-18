@@ -21,7 +21,7 @@
 
 </details>
 
-## 설치 → 새 탭 → 실행
+## 명령 하나로 설치하고 바로 실행
 
 ```zsh
 git clone https://github.com/wl39/oh-my-usage.git
@@ -29,17 +29,13 @@ cd oh-my-usage
 ./install.sh
 ```
 
-Python과 zsh를 먼저 준비하세요. Debian/Ubuntu에서는 `sudo apt-get install python3 python3-venv zsh`, macOS에서는 필요할 때 `brew install python zsh`를 사용합니다. `./install.sh` 자체는 sudo 없이 실행합니다. 기본 설치는 OpenUsage 없이 동작하는 `direct` 모드이며 새 설치에서는 내부 표시가 자동으로 켜집니다. 기존 표시 설정은 보존합니다.
+`./install.sh` 자체는 **sudo 없이 본인 계정으로 실행**하세요. Linux에서 Python 3.9+·venv/pip·zsh 등 필요한 시스템 패키지가 없으면 설치기가 패키지 관리자로 준비하며, 그때만 sudo 비밀번호를 요청합니다. 전용 Python 환경 생성·복구, 의존성 설치, 명령 등록, 첫 서비스 감지와 사용량 조회까지 이어서 처리합니다. **Linux에서는 OpenUsage를 설치하거나 실행하지 않습니다.** `install-full.sh`·`install-existing.sh`도 Linux에서는 독립 조회로 설치합니다.
 
-**설치 후 새 zsh 터미널 탭을 한 번 여세요.** 이후에는 이 명령 하나로 실행합니다.
+대화형 터미널에서는 설치 직후 준비된 zsh로 들어갑니다. 새 탭, `source`, PATH 설정 없이 곧바로 `oh-my-usage`를 실행하고 프롬프트 표시를 사용할 수 있습니다. `oh-my-usage providers`로 11개 서비스의 연결 상태를 확인하세요. 설치·로그인된 클라이언트는 자동 연동하며, API 키가 필요한 서비스는 해당 키를 등록해야 합니다. 기존 표시 설정은 보존합니다. `exit`하면 이전 셸로 돌아가며, 다음 터미널에서도 프롬프트 표시를 쓰려면 zsh를 사용하세요. 기본 로그인 셸은 변경하지 않습니다.
 
-```zsh
-oh-my-usage start
-```
+자동화 설치는 `./install.sh --no-start`로 첫 조회와 대화형 셸 진입을 생략할 수 있습니다. `--no-shell`은 프롬프트 연동 없이 CLI만 설치합니다. 어느 셸에서든 `~/.local/bin/oh-my-usage`로 실행할 수 있습니다. 비대화형 실행에서는 새 셸을 열지 않습니다. **`No module named pip`가 발생했던 경우에도 `./install.sh`를 다시 실행하면 복구**하며, 저장한 설정은 유지합니다.
 
-전체 서비스의 로컬 로그인 정보를 감지하고 조회 가능한 사용량을 표시합니다. 새 탭의 첫 프롬프트에서도 자동으로 조회하므로 매번 `start`를 실행할 필요는 없습니다. 새로 설치하거나 로그인한 서비스도 다음 갱신 시 연결합니다. 일반 설치에서는 `source`, PATH 설정, `.zshrc` 수동 편집이 필요 없습니다.
-
-> 설치 프로그램은 별도 프로세스라서 이미 열린 셸에는 명령을 직접 추가할 수 없습니다. 설치 직후 새 탭만 한 번 열어 주세요. iTerm2 상태바는 아래 컴포넌트 추가도 최초 한 번 필요합니다. 터미널 내부 표시에는 상태바 설정이 필요 없습니다.
+macOS의 누락된 필수 도구는 기존 Homebrew로 설치합니다. OpenUsage는 macOS에서 선택 사항입니다. iTerm2 상태바에는 아래의 컴포넌트 추가가 최초 한 번 필요하며, 터미널 내부 표시는 별도 상태바 설정이 필요 없습니다.
 
 설치 안내와 도움말은 터미널에서 색상으로 구분해 표시합니다. 파일 저장·파이프 출력은 일반 텍스트입니다. 색상을 끄려면 `NO_COLOR=1`을 설정하세요. `TERM=dumb` 환경에서도 색상을 사용하지 않습니다.
 
@@ -174,7 +170,7 @@ git pull --ff-only
 ./install.sh
 ```
 
-새 탭을 열고 `oh-my-usage start`를 실행합니다. 처음에 사용자 지정 `--prefix`나 `--no-shell`을 썼다면 같은 옵션을 붙이세요.
+대화형 터미널에서는 설치기가 첫 조회 후 준비된 zsh로 진입합니다. 처음에 사용자 지정 `--prefix`나 `--no-shell`을 썼다면 같은 옵션을 붙이세요.
 
 **v0.7.0 변경:** 전체 11개 서비스 독립 조회, 자동 감지·연결, Linux 설치, 서비스별 재시도 제어, 30일 사용량 이력을 추가했습니다. 기본 설치는 독립 모드를 선택합니다. 기존 OpenUsage 연동을 유지하려면 `./install-existing.sh`를 사용하세요.
 
@@ -194,7 +190,8 @@ Antigravity, Claude, Codex, GitHub Copilot, Cursor, Devin, Grok, Ollama, OpenCod
 
 | 증상 | 해결 방법 |
 | --- | --- |
-| `command not found` | 설치 후 새 **zsh** 탭 열기. `--no-shell`로 직접 관리한다면 플러그인을 따로 불러와야 함 |
+| `command not found` | `zsh` 실행 또는 `~/.local/bin/oh-my-usage` 사용. `--no-shell`은 프롬프트 표시용 플러그인을 따로 불러와야 함 |
+| `No module named pip` 설치 오류 | 최신 코드를 받고 `./install.sh` 재실행. 전용 환경을 자동 복구함 |
 | 상태바가 비어 있음 | 현재 프로필과 정확한 `\(user.oh_my_usage)` 값 확인 후 `start` |
 | 내부 표시가 안 나옴 | `inline status` 확인 후 `inline on`, 입력 전부 지우기. 매우 긴 테마는 오른쪽 공간을 가릴 수 있음 |
 | `[offline]` | 같은 Mac 계정에서 `start`. 마지막으로 받은 데이터를 표시 중 |
@@ -210,7 +207,7 @@ Antigravity, Claude, Codex, GitHub Copilot, Cursor, Devin, Grok, Ollama, OpenCod
 <details>
 <summary>설치 모드·환경 변수·스크립트·Oh My Zsh</summary>
 
-기본 `./install.sh`는 macOS/Linux 독립 설치입니다. 기존 macOS 전용 두 모드도 유지합니다. `./install-full.sh`는 OpenUsage가 없으면 설치하고, `./install-existing.sh`는 설치된 앱만 사용합니다. 설치 위치는 `~/.local/share/oh-my-usage`입니다. 셸 설정을 백업하고 `~/.zshrc` 또는 `$ZDOTDIR/.zshrc`에 플러그인을 등록합니다. `sudo`는 사용하지 마세요. `--prefix /원하는/경로`로 위치를 바꾸거나 `--no-shell`로 셸 로딩을 직접 관리할 수 있습니다.
+기본 `./install.sh`는 macOS/Linux 독립 설치입니다. 기존 macOS 전용 두 모드도 유지합니다. `./install-full.sh`는 OpenUsage가 없으면 설치하고, `./install-existing.sh`는 설치된 앱만 사용합니다. 설치 위치는 `~/.local/share/oh-my-usage`입니다. 셸 설정을 백업하고 `~/.zshrc` 또는 `$ZDOTDIR/.zshrc`에 플러그인을 등록합니다. 두 보조 설치 스크립트도 Linux에서는 독립 모드로 설치합니다. 설치 명령 앞에 `sudo`를 붙이지 마세요. 필요한 시스템 패키지 설치에만 설치기가 sudo를 요청합니다. `--prefix /원하는/경로`로 위치를 바꾸거나 `--no-shell`로 셸 로딩을 직접 관리할 수 있습니다.
 
 필요한 환경 변수만 플러그인 로딩 전에 설정합니다.
 
@@ -267,7 +264,7 @@ Python과 zsh를 사용하며 Ollama의 요청 서명에만 `cryptography`가 �
 
 `direct` 모드는 OpenUsage의 API·설정·캐시를 사용하지 않습니다. 선택적인 `openusage` 모드는 기존 로컬 API와 표시 설정을 유지합니다. 서비스의 일부 API는 비공개 형식이므로 변경될 수 있습니다. 참조한 OpenUsage 형식 구현의 MIT 고지는 `oh_my_usage/providers/third_party`에 있으며 설치에도 포함됩니다.
 
-개발 환경에 `requirements.txt`를 설치하고 `./scripts/check.sh`로 검증합니다. 11개 응답 형식, 로그인 감지, 서명, 실패·호출 제한, 이력, 실제 zsh 가상 터미널 테스트를 포함하며 CI는 macOS/Linux에서 실행합니다.
+개발 환경에 `requirements.txt`를 설치하고 `./scripts/check.sh`로 검증합니다. 11개 응답 형식, 로그인 감지, 서명, 실패·호출 제한, 이력, 실제 zsh 가상 터미널 테스트를 macOS/Linux CI에서 실행합니다. 또한 별도 기본 Ubuntu 22.04/24.04 컨테이너에서 필수 패키지 자동 설치·pip 복구·설치 직후 셸 실행도 검증합니다.
 
 README 이미지는 macOS에서 `scripts/record_demo.py`로 다시 만들 수 있습니다. 필요한 개발용 패키지는 파일 상단에 안내되어 있으며, 예시 데이터를 넣은 독립 zsh 세션을 사용합니다. 이미지 생성 도구와 이미지 파일은 프로그램 설치에서 제외됩니다.
 

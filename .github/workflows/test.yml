@@ -17,3 +17,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y zsh
       - run: python -m pip install -r requirements.txt
       - run: ./scripts/check.sh
+  linux-installer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        ubuntu: ['22.04', '24.04']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install from a pristine Ubuntu image as a regular user
+        run: docker run --rm -v "$PWD:/src:ro" ubuntu:${{ matrix.ubuntu }} sh /src/tests/integration/install-linux.sh --as-user

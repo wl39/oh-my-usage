@@ -1,37 +1,61 @@
 #!/bin/sh
-# Independent macOS/Linux installation; OpenUsage integration is explicitly optional.
+# One-command independent setup. Linux never installs or launches OpenUsage.
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 mode=direct
 case ${1:-} in direct|full|existing|uninstall) mode=$1; shift ;; esac
 case ${1:-} in --help|-h)
-  echo 'Usage: ./install.sh [direct|full|existing|uninstall] [--no-shell] [--prefix PATH]'
-  echo 'Default: independent macOS/Linux install. full/existing opt into OpenUsage (macOS).'
+  echo 'Usage: ./install.sh [direct|full|existing|uninstall] [--no-shell] [--no-start] [--prefix PATH]'
+  echo 'Installs missing prerequisites, repairs the private environment, discovers services and opens a ready zsh.'
+  echo 'Linux always uses direct collection. full/existing opt into OpenUsage only on macOS.'
+  echo '--no-start skips the first usage read and automatic interactive shell (for unattended installation).'
   exit 0 ;;
 esac
-python=${OH_MY_USAGE_PYTHON:-python3}
-if [ "$mode" = uninstall ] && [ -z "${OH_MY_USAGE_PYTHON:-}" ]; then
-  prefix="$HOME/.local/share/oh-my-usage"
-  [ ! -f "$root/.oh-my-usage-install" ] || prefix=$root
-  next_prefix=no
-  for argument in "$@"; do
-    if [ "$next_prefix" = yes ]; then prefix=$argument; next_prefix=no; fi
-    [ "$argument" != --prefix ] || next_prefix=yes
-  done
-  if [ -r "$prefix/python-path" ]; then IFS= read -r python < "$prefix/python-path"; fi
+# Validate all options before downloading packages or changing the machine.
+with_shell=yes start=yes next_prefix=no
+prefix="$HOME/.local/share/oh-my-usage"
+[ ! -f "$root/.oh-my-usage-install" ] || prefix=$root
+for argument in "$@"; do
+  if [ "$next_prefix" = yes ]; then
+    [ -n "$argument" ] || { echo '--prefix needs a path' >&2; exit 2; }
+    prefix=$argument; next_prefix=no; continue
+  fi
+  case $argument in
+    --no-shell) with_shell=no ;;
+    --no-profile) : ;;
+    --no-start) start=no ;;
+    --prefix) next_prefix=yes ;;
+    *) echo "Unknown option: $argument" >&2; exit 2 ;;
+  esac
+done
+[ "$next_prefix" = no ] || { echo '--prefix needs a path' >&2; exit 2; }
+platform=$(uname -s)
+case $platform in Darwin|Linux) ;; *) echo 'Supported installer hosts: macOS and Linux.' >&2; exit 1 ;; esac
+if [ "$platform" = Linux ] && { [ "$mode" = full ] || [ "$mode" = existing ]; }; then
+  echo 'Linux: using independent collection; OpenUsage is not needed.'
+  mode=direct
 fi
-if ! "$python" -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null; then
-  echo 'Install Python 3.9+ first (Linux: python3 and python3-venv; macOS: brew install python).' >&2
+python=${OH_MY_USAGE_PYTHON:-python3}
+export PYTHONDONTWRITEBYTECODE=1
+if [ "$mode" = uninstall ]; then
+  if [ -r "$prefix/python-path" ] && [ -z "${OH_MY_USAGE_PYTHON:-}" ]; then IFS= read -r python < "$prefix/python-path"; fi
+  PYTHONPATH="$root" exec "$python" "$root/scripts/install.py" uninstall "$@"
+fi
+# Do not install into root's home merely because the user prefixed the command with sudo.
+if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+  echo 'Run ./install.sh as your own user. It invokes sudo only for missing system packages.' >&2
   exit 1
 fi
+if [ -e "$prefix" ] && [ ! -f "$prefix/.oh-my-usage-install" ]; then
+  echo "Refusing to replace an unowned directory: $prefix" >&2; exit 1
+fi
+. "$root/scripts/bootstrap.sh"
+omu_bootstrap
 app=''
 if [ "$mode" = full ] || [ "$mode" = existing ]; then
-  [ "$(uname -s)" = Darwin ] || { echo 'OpenUsage mode requires macOS; use ./install.sh for independent Linux support.' >&2; exit 1; }
   app_dir=${OH_MY_USAGE_APP_DIR:-/Applications}
   app="$app_dir/OpenUsage.app"
-  if [ ! -d "$app" ] && [ -z "${OH_MY_USAGE_APP_DIR:-}" ] && [ -d "$HOME/Applications/OpenUsage.app" ]; then
-    app="$HOME/Applications/OpenUsage.app"
-  fi
+  if [ ! -d "$app" ] && [ -z "${OH_MY_USAGE_APP_DIR:-}" ] && [ -d "$HOME/Applications/OpenUsage.app" ]; then app="$HOME/Applications/OpenUsage.app"; fi
   if [ ! -d "$app" ]; then
     [ "$mode" = full ] || { echo 'OpenUsage was not found; use ./install-full.sh or independent ./install.sh.' >&2; exit 1; }
     version=$(sw_vers -productVersion)
@@ -42,10 +66,14 @@ if [ "$mode" = full ] || [ "$mode" = existing ]; then
     [ -d "$app" ] || { echo 'OpenUsage installation did not finish.' >&2; exit 1; }
   fi
 fi
-export PYTHONDONTWRITEBYTECODE=1
-if [ "$mode" = direct ]; then
-  PYTHONPATH="$root" "$python" "$root/scripts/install.py" "$mode" --with-dependencies "$@"
-else
-  PYTHONPATH="$root" "$python" "$root/scripts/install.py" "$mode" "$@"
-fi
+activate=no
+if [ "$with_shell" = yes ] && [ "$start" = yes ] && [ -t 0 ] && [ -t 1 ]; then activate=yes; fi
+if [ "$mode" = direct ]; then set -- "$@" --with-dependencies; fi
+if [ "$activate" = yes ]; then set -- "$@" --activate; fi
+PYTHONPATH="$root" "$python" "$root/scripts/install.py" "$mode" "$@"
 if [ -n "$app" ]; then open "$app"; fi
+if [ "$activate" = yes ]; then
+  # An executable cannot alter its parent shell. Enter a configured shell now,
+  # retaining the working directory; future terminals load the saved integration.
+  exec zsh -i
+fi

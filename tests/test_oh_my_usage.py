@@ -552,7 +552,7 @@ _oh_my_usage_emit U0hPVUxELU5PVC1TSF9PVw==
             for name, content in stubs.items():
                 (binaries / name).write_text(content)
                 (binaries / name).chmod(0o755)
-            env = dict(os.environ, OH_MY_USAGE_APP_DIR=str(appdir), OH_MY_USAGE_PYTHON=sys.executable,
+            env = dict(os.environ, HOME=str(root), OH_MY_USAGE_APP_DIR=str(appdir), OH_MY_USAGE_PYTHON=sys.executable,
                        OH_MY_USAGE_CACHE_DIR=str(root / "cache"),
                        OH_MY_USAGE_CONFIG_DIR=str(root / "config"),
                        ZDOTDIR=str(root), CALLS=str(log), PATH=str(binaries) + ":" + os.environ["PATH"])

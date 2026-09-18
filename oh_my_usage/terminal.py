@@ -84,15 +84,21 @@ def help_screen(console):
     console.line()
 
 
-def installed_screen(prefix, shell):
+def installed_screen(prefix, shell, activate=False):
     console = Console()
     console.title("Ready to use")
     console.line("  Installed successfully", "1;32")
     console.note(str(prefix), "2")
     console.section("NEXT")
-    console.note("1. Open a new zsh terminal tab." if shell else
-                 "1. Load oh-my-usage with your plugin manager.")
-    console.note("2. Run from any folder:")
+    if activate:
+        console.note("Opening your configured zsh now. Commands and prompt integration are ready.")
+        console.note("Use exit to return to your previous shell; use zsh in future terminals.")
+    else:
+        console.note("1. Open a new zsh terminal tab (or run zsh)." if shell else
+                     "1. Load oh-my-usage with your plugin manager for prompt integration.")
+        if not shell:
+            console.note(f"CLI is ready: {prefix / 'bin/oh-my-usage'}")
+    console.note("Run from any folder:")
     console.command("oh-my-usage start")
     console.command("oh-my-usage providers", "Automatically discovered services and connection status.")
     console.section("MAKE IT YOURS")
@@ -100,10 +106,11 @@ def installed_screen(prefix, shell):
     console.command("oh-my-usage inline off", "Disable inline; saved for next time.")
     console.command("oh-my-usage config", "Preview position, icons, meter, and color.")
     console.command("oh-my-usage", "Show all commands and help.")
-    console.section("ITERM2 STATUS BAR · ONCE")
-    console.note("Settings > Profiles > Session > Configure Status Bar")
-    console.note("Enable the status bar and add Interpolated String:")
-    console.command(r"\(user.oh_my_usage)")
+    if sys.platform == "darwin":
+        console.section("ITERM2 STATUS BAR · ONCE")
+        console.note("Settings > Profiles > Session > Configure Status Bar")
+        console.note("Enable the status bar and add Interpolated String:")
+        console.command(r"\(user.oh_my_usage)")
     console.line()
 
 

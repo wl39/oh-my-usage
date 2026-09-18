@@ -21,7 +21,7 @@
 
 </details>
 
-## 安装 → 打开新标签页 → 启动
+## 一条命令安装并启动
 
 ```zsh
 git clone https://github.com/wl39/oh-my-usage.git
@@ -29,17 +29,13 @@ cd oh-my-usage
 ./install.sh
 ```
 
-先安装 Python 和 zsh。Debian/Ubuntu：`sudo apt-get install python3 python3-venv zsh`。macOS 可按需使用 `brew install python zsh`。不使用 sudo 运行本安装程序。默认 `direct` 模式无需 OpenUsage，新安装会启用行内显示；已有显示偏好保持不变。
+以自己的账户运行 `./install.sh`，不要在前面加 sudo。Linux 安装程序通过系统包管理器补齐 Python 3.9+、venv/pip、zsh 等依赖，仅在需要系统软件包时请求 sudo。随后创建或修复独立 Python 环境、安装依赖、注册命令，并首次发现服务和读取用量。**Linux 永远不会安装或启动 OpenUsage**；`install-full.sh` 和 `install-existing.sh` 在 Linux 上也使用独立模式。
 
-**安装完成后，打开一个新的 zsh 终端标签页。** 然后只需执行：
+交互式终端安装完成后会直接进入配置好的 zsh，无需新标签页、手动 source 或 PATH 设置。运行 `oh-my-usage providers` 查看全部 11 个服务的连接状态。已安装并登录的客户端自动连接；需要 API 密钥的服务仍需提供密钥。已有显示偏好保持不变。`exit` 返回原来的 shell；以后的终端请使用 zsh。安装程序不会更改登录 shell。
 
-```zsh
-oh-my-usage start
-```
+自动化安装可用 `./install.sh --no-start` 跳过首次查询和交互式 shell。`--no-shell` 仅安装 CLI；任何 shell 均可运行 `~/.local/bin/oh-my-usage`。非交互式安装不会打开 shell。遇到 **No module named pip** 时重新运行 `./install.sh` 即可修复，保存的偏好不会删除。
 
-此命令发现已登录的服务、读取用量并更新显示。新标签页的第一个提示符也会自动启动发现；之后新安装或登录的服务在后续刷新时连接。普通安装无需手动配置 PATH、source 或编辑 `.zshrc`。
-
-> 安装程序是独立进程，不能直接向已经打开的 shell 添加命令，所以安装后需要打开一次新标签页。iTerm2 状态栏还需完成下方的一次性组件设置。终端内显示不需要状态栏设置。
+macOS 通过已有 Homebrew 安装缺失的依赖，OpenUsage 仍为可选。iTerm2 状态栏需完成下方的一次性组件设置，行内显示无需此设置。
 
 安装说明和帮助在终端中使用柔和的颜色区分内容。重定向到文件或管道时输出纯文本。设置 `NO_COLOR=1` 可关闭颜色，`TERM=dumb` 环境也不会使用颜色。
 
@@ -172,7 +168,7 @@ git pull --ff-only
 ./install.sh
 ```
 
-打开新标签页，再运行 `oh-my-usage start`。如果首次安装使用了自定义 `--prefix` 或 `--no-shell`，请保留相同选项。
+在交互式终端中，安装程序会读取用量并进入配置好的 zsh。如果首次安装使用了自定义 `--prefix` 或 `--no-shell`，请保留相同选项。
 
 **v0.7.0 更新：** 11 个服务的独立适配器、自动发现连接、Linux 安装、服务级重试和 30 天用量快照。`./install.sh` 选择独立模式；`./install-existing.sh` 保留可选的 OpenUsage 集成。
 
@@ -182,7 +178,8 @@ git pull --ff-only
 
 | 现象 | 处理方法 |
 | --- | --- |
-| `command not found` | 安装后打开新的 **zsh** 标签页；使用 `--no-shell` 时需自行加载插件 |
+| `command not found` | 运行 `zsh` 或 `~/.local/bin/oh-my-usage`；使用 `--no-shell` 时需自行加载提示符插件 |
+| 安装时出现 `No module named pip` | 更新代码后重新运行 `./install.sh`，自动修复独立 Python 环境 |
 | 状态栏为空 | 检查配置文件及准确的 `\(user.oh_my_usage)` 值，然后运行 `start` |
 | 没有终端内提示 | 查看 `inline status`，运行 `inline on` 并清空输入；过长的主题可能占满右侧空间 |
 | `[offline]` | 在同一 Mac 账户中运行 `start`；当前显示的是上次成功读取的数据 |

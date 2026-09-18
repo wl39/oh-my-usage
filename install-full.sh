@@ -1,2 +1,2 @@
-#!/bin/zsh
-exec "${0:A:h}/install.sh" full "$@"
+#!/bin/sh
+exec "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/install.sh" full "$@"

@@ -21,7 +21,7 @@ Choose a number to change a setting. Changes save immediately and apply to futur
 
 </details>
 
-## Install → open a new tab → start
+## Install and start with one command
 
 ```zsh
 git clone https://github.com/wl39/oh-my-usage.git
@@ -29,17 +29,13 @@ cd oh-my-usage
 ./install.sh
 ```
 
-Install Python and zsh first. On Debian/Ubuntu: `sudo apt-get install python3 python3-venv zsh`; on macOS: `brew install python zsh` if needed. Run the installer without sudo. It installs into `~/.local/share/oh-my-usage`, sets the source to `direct`, and enables inline display for new installations. Existing display choices are preserved. No OpenUsage installation is required.
+Run `./install.sh` as your own user, without sudo. On Linux it installs missing Python 3.9+, venv/pip, zsh and system prerequisites through the package manager, requesting sudo only when needed. It creates or repairs the private Python environment, installs dependencies, registers the command, and performs the first service discovery and usage read. **Linux never installs or launches OpenUsage**, including when using `install-full.sh` or `install-existing.sh`.
 
-**Open a new zsh terminal tab after installation.** Then run just:
+In an interactive terminal, installation opens a configured zsh immediately: `oh-my-usage` and prompt integration are ready without a new tab, manual `source`, or PATH edits. Run `oh-my-usage providers` to see all 11 connection states. Installed, signed-in clients connect automatically; services requiring API keys still need their keys. Existing display settings are preserved. `exit` returns to the previous shell; use zsh in future terminals (the installer does not change your login shell).
 
-```zsh
-oh-my-usage start
-```
+Use `./install.sh --no-start` for unattended setup without the initial usage read or interactive shell. `--no-shell` installs the CLI without prompt integration; run `~/.local/bin/oh-my-usage` from any shell. Non-interactive installation never opens a shell. Re-running `./install.sh` repairs incomplete environments, including **No module named pip**, without deleting saved preferences.
 
-This discovers all supported services, reads usage for available logins, and updates your display. The first prompt also starts discovery automatically. Newly installed or signed-in clients are found at subsequent prompt refreshes; failed services do not block successful ones. No manual `source`, PATH setup, or `.zshrc` editing is needed with the normal installer.
-
-> The installer runs as a separate process, so an already-open shell needs a new tab to pick up the command. The iTerm2 status bar also needs the one-time component setup below. Inline display needs no status bar setup.
+On macOS, missing prerequisites are installed through an existing Homebrew installation. OpenUsage remains optional on macOS. The iTerm2 status bar needs the one-time component setup below; the inline prompt does not.
 
 Help and installation instructions use subtle colors in a terminal. Redirected output stays plain text. Set `NO_COLOR=1` to disable color; `TERM=dumb` is also respected.
 
@@ -176,7 +172,7 @@ git pull --ff-only
 ./install.sh
 ```
 
-Open a new tab, then use `oh-my-usage start`. Reuse any custom `--prefix` or `--no-shell` option from your original install.
+In an interactive terminal the installer refreshes usage and opens a ready zsh. Reuse any custom `--prefix` or `--no-shell` option from your original install.
 
 **New in v0.7.0:** independent adapters for all 11 services, automatic connection discovery, Linux installation, per-service cooldowns, and 30-day snapshot history. `./install.sh` selects direct collection; use `./install-existing.sh` to retain the optional OpenUsage backend.
 
@@ -194,7 +190,8 @@ Start with `oh-my-usage doctor`.
 
 | Symptom | Fix |
 | --- | --- |
-| `command not found` | Open a new **zsh** tab after installing; a custom `--no-shell` setup must load the plugin itself |
+| `command not found` | Run `zsh` or `~/.local/bin/oh-my-usage`; with `--no-shell`, load the plugin for prompt integration |
+| `No module named pip` during installation | Pull the latest code and rerun `./install.sh`; the private environment is repaired automatically |
 | Empty status bar | Check the profile and exact `\(user.oh_my_usage)` value, then run `start` |
 | No inline hint | Run `inline status`, then `inline on`; clear input. A very long theme may leave no right-prompt space |
 | `[offline]` | A cached read is shown; run `providers --refresh` / `doctor` to inspect failures |
@@ -210,7 +207,7 @@ In optional OpenUsage mode, a missing `menuBarPins` key uses OpenUsage's default
 <details>
 <summary>Installation modes, configuration, scripts, and Oh My Zsh</summary>
 
-The default `./install.sh` works independently on macOS/Linux. The original macOS-only modes remain available: `./install-full.sh` installs OpenUsage if missing; `./install-existing.sh` requires an existing app. Both install to `~/.local/share/oh-my-usage`, back up shell configuration, and register the plugin in `~/.zshrc` or `$ZDOTDIR/.zshrc`. Do not use `sudo`. Use `--prefix /your/install/path` for a custom directory, or `--no-shell` for manual plugin management.
+The default `./install.sh` works independently on macOS/Linux. The original macOS-only modes remain available: `./install-full.sh` installs OpenUsage if missing; `./install-existing.sh` requires an existing app. Both install to `~/.local/share/oh-my-usage`, back up shell configuration, and register the plugin in `~/.zshrc` or `$ZDOTDIR/.zshrc`. The wrappers also use direct mode on Linux. Do not prefix the installer with `sudo`; it requests privilege only for missing system packages. Use `--prefix /your/install/path` for a custom directory, or `--no-shell` for manual plugin management.
 
 Optional environment variables, placed before the plugin loads:
 
@@ -267,7 +264,7 @@ The collector is Python + zsh, with `cryptography` used only for Ollama request 
 
 The `direct` backend never calls or reads OpenUsage. Optional `openusage` mode retains the loopback API and upstream display preferences for compatibility. Direct metrics default to the first two available meters per service; settings allow more explicit choices.
 
-Run `python3 -m pip install -r requirements.txt` in a development environment, then `./scripts/check.sh`. Tests cover all 11 response contracts, native-store discovery, signed requests, source switching, failure isolation, history and real zsh pseudo-terminals. CI runs on macOS and Linux. The provider protocols are partly private and can change; see [sources and support scope](docs/providers.md). The MIT notice for referenced OpenUsage protocol/format code is included under `oh_my_usage/providers/third_party` and shipped by the installer.
+Run `python3 -m pip install -r requirements.txt` in a development environment, then `./scripts/check.sh`. Tests cover all 11 response contracts, native-store discovery, signed requests, source switching, failure isolation, history and real zsh pseudo-terminals. CI runs on macOS and Linux, with separate pristine Ubuntu 22.04/24.04 installation tests (missing prerequisites, pip recovery and immediate shell use). The provider protocols are partly private and can change; see [sources and support scope](docs/providers.md). The MIT notice for referenced OpenUsage protocol/format code is included under `oh_my_usage/providers/third_party` and shipped by the installer.
 
 README media can be regenerated on macOS with `scripts/record_demo.py`; its docstring lists the optional development dependencies. It uses an isolated zsh session with sample data. The media generator and assets are excluded from installation.
 

@@ -18,6 +18,73 @@ ROOT = Path(__file__).resolve().parent.parent
 START = "# >>> oh-my-usage >>>"
 END = "# <<< oh-my-usage <<<"
 PROFILE_GUID = "3E42E713-38CF-4B51-B58D-50306D69E148"
+LAUNCHER_MARKER = "# oh-my-usage managed launcher"
+
+
+def python_check(python, *args):
+    try:
+        return subprocess.run([str(python), *args], stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL, timeout=30).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def prepare_runtime(prefix):
+    """Repair pipless venvs; replace broken ones without touching system Python."""
+    environment = prefix / ".venv"
+    if environment.is_symlink() or (environment.exists() and not environment.is_dir()):
+        raise ValueError(f"Refusing to replace a non-directory or symlink: {environment}")
+    python = environment / "bin/python"
+    healthy = python_check(python, "-c",
+                           "import sys, ssl, sqlite3; from pathlib import Path; "
+                           "sys.exit(not (sys.version_info >= (3, 9) and "
+                           "sys.prefix != sys.base_prefix and "
+                           "Path(sys.prefix).resolve() == Path(sys.argv[1]).resolve()))",
+                           str(environment))
+    if healthy and not python_check(python, "-m", "pip", "--version"):
+        print("Repairing pip in the existing private Python environment...", flush=True)
+        healthy = python_check(python, "-m", "ensurepip", "--upgrade")
+        healthy = healthy and python_check(python, "-m", "pip", "--version")
+    backup = None
+    rebuilding = not healthy
+    if rebuilding and environment.exists():
+        print("Rebuilding the incomplete private Python environment...", flush=True)
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        backup = environment.with_name(".venv-backup-" + stamp)
+        environment.rename(backup)
+    try:
+        if rebuilding:
+            # Create at its final path: venv scripts contain absolute paths.
+            subprocess.run([sys.executable, "-m", "venv", str(environment)], check=True)
+        subprocess.run([str(python), "-m", "pip", "install", "--disable-pip-version-check",
+                        "-r", str(prefix / "requirements.txt")], check=True)
+        subprocess.run([str(python), "-c", "import cryptography"], check=True)
+    except BaseException:
+        if rebuilding:
+            if environment.exists():
+                shutil.rmtree(environment)
+            if backup:
+                backup.rename(environment)
+        raise
+    if backup:
+        shutil.rmtree(backup)
+    return str(python)
+
+
+def launcher_text(prefix):
+    return f'#!/bin/sh\n{LAUNCHER_MARKER}\nexec {shlex.quote(str(prefix / "bin/oh-my-usage"))} "$@"\n'
+
+
+def first_read(prefix):
+    print("Discovering installed services and reading available usage...", flush=True)
+    try:
+        result = subprocess.run([str(prefix / "bin/oh-my-usage"), "start"],
+                                env=dict(os.environ, OH_MY_USAGE_SOURCE="direct"), timeout=90)
+        if result.returncode == 0:
+            return
+    except subprocess.TimeoutExpired:
+        pass
+    print("Installation is complete. Some usage could not be read yet; run oh-my-usage providers or doctor.")
 
 
 def without_block(text, start=START, end=END):
@@ -59,7 +126,7 @@ def remove_legacy_profile(manifest):
             p.unlink()
 
 
-def install(prefix, home, shell=True, mode="direct", dependencies=False):
+def install(prefix, home, shell=True, mode="direct", dependencies=False, start=False, activate=False):
     if shell and not shutil.which("zsh"):
         raise ValueError("Install zsh for prompt integration, or use --no-shell for CLI-only installation")
     rc = Path(os.environ.get("ZDOTDIR", str(home))) / ".zshrc"
@@ -71,6 +138,10 @@ def install(prefix, home, shell=True, mode="direct", dependencies=False):
     previous = json.loads(marker.read_text()) if marker.exists() else {}
     if previous.get("shell") and str(rc) != previous["rc"]:
         raise ValueError("ZDOTDIR changed; uninstall the previous installation first")
+    launcher = home / ".local/bin/oh-my-usage"
+    if launcher.is_symlink() or (launcher.exists() and
+                                (not launcher.is_file() or launcher.read_text() != launcher_text(prefix))):
+        raise ValueError(f"Refusing to replace an unrelated command: {launcher}")
     remove_legacy_profile(previous)
     prefix.mkdir(parents=True, exist_ok=True)
     # A failed dependency download remains a recognized, retryable installation.
@@ -81,30 +152,32 @@ def install(prefix, home, shell=True, mode="direct", dependencies=False):
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     # Explicit files keep local notes, previews, and test tools out of installations.
     for name in ("oh-my-usage.plugin.zsh", "install.sh", "README.md", "LICENSE",
-                 "scripts/install.py", "requirements.txt", "docs/providers.md", "docs/README.ko.md", "docs/README.zh-CN.md"):
+                 "scripts/install.py", "scripts/bootstrap.sh", "requirements.txt", "docs/providers.md", "docs/README.ko.md", "docs/README.zh-CN.md"):
         (prefix / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / name, prefix / name)
     python = sys.executable
     if dependencies:
-        environment = prefix / ".venv"
-        if not (environment / "bin/python").exists():
-            subprocess.run([sys.executable, "-m", "venv", str(environment)], check=True)
-        python = str(environment / "bin/python")
-        subprocess.run([python, "-m", "pip", "install", "--disable-pip-version-check", "-r", str(prefix / "requirements.txt")], check=True)
+        python = prepare_runtime(prefix)
     (prefix / "python-path").write_text(python + "\n")
+    launcher.parent.mkdir(parents=True, exist_ok=True)
+    launcher.write_text(launcher_text(prefix))
+    launcher.chmod(0o755)
     cache = cache_directory(home)
-    marker.write_text(json.dumps({"rc": str(rc), "cache": str(cache),
+    marker.write_text(json.dumps({"rc": str(rc), "cache": str(cache), "launcher": str(launcher),
                                   "shell": shell or previous.get("shell", False)}))
     if shell:
         quoted = shlex.quote(str(prefix / "oh-my-usage.plugin.zsh"))
-        write_shell(rc, f"{START}\n[[ -r {quoted} ]] && source {quoted}\n{END}\n")
+        write_shell(rc, f'{START}\nexport PATH={shlex.quote(str(launcher.parent))}:"$PATH"\n'
+                    f"[[ -r {quoted} ]] && source {quoted}\n{END}\n")
     settings = Path(os.environ.get("OH_MY_USAGE_CONFIG_DIR") or
                     Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config") / "oh-my-usage")
     settings.mkdir(parents=True, exist_ok=True, mode=0o700)
     atomic_write(settings / "source", ("direct" if mode == "direct" else "openusage") + "\n")
     if mode == "direct" and not (settings / "inline").exists():
         atomic_write(settings / "inline", "on\n")
-    installed_screen(prefix, shell or previous.get("shell", False))
+    if start and mode == "direct":
+        first_read(prefix)
+    installed_screen(prefix, shell or previous.get("shell", False), activate=activate)
 
 
 def uninstall(prefix):
@@ -121,6 +194,10 @@ def uninstall(prefix):
         else:
             write_shell(Path(manifest["rc"]), "")
     remove_legacy_profile(manifest)
+    if manifest.get("launcher"):
+        launcher = Path(manifest["launcher"])
+        if not launcher.is_symlink() and launcher.is_file() and launcher.read_text() == launcher_text(prefix):
+            launcher.unlink()
     if manifest.get("cache"):
         cache = Path(manifest["cache"])
         # Custom cache directories may contain unrelated files; only remove ours.
@@ -146,6 +223,8 @@ def main():
     parser.add_argument("--prefix", type=Path, default=default_prefix)
     parser.add_argument("--no-profile", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--no-shell", action="store_true")
+    parser.add_argument("--no-start", action="store_true", help="Skip initial usage lookup and interactive shell")
+    parser.add_argument("--activate", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--with-dependencies", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     prefix = args.prefix.expanduser().resolve()
@@ -155,9 +234,10 @@ def main():
         if args.mode == "uninstall":
             uninstall(prefix)
         else:
-            install(prefix, Path.home(), not args.no_shell, args.mode, args.with_dependencies)
+            install(prefix, Path.home(), not args.no_shell, args.mode, args.with_dependencies,
+                    start=not args.no_start, activate=args.activate)
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
-        parser.exit(1, f"oh-my-usage: {error}\n")
+        parser.exit(1, f"oh-my-usage: {error}\nFix the reported problem and rerun ./install.sh; incomplete environments are repaired automatically.\n")
 
 
 if __name__ == "__main__":

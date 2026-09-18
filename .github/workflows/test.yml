@@ -23,7 +23,22 @@ jobs:
     strategy:
       matrix:
         ubuntu: ['22.04', '24.04']
+        apt: ['healthy', 'missing-release']
     steps:
       - uses: actions/checkout@v4
-      - name: Install from a pristine Ubuntu image as a regular user
-        run: docker run --rm -v "$PWD:/src:ro" ubuntu:${{ matrix.ubuntu }} sh /src/tests/integration/install-linux.sh --as-user
+      - name: Start an HTTP 404 repository fixture
+        run: |
+          docker network create omu-installer-test
+          docker run -d --name apt-404 --network omu-installer-test python:3.9-slim python -m http.server 8000 --directory /tmp
+      - name: Install from Ubuntu as a regular user, including a broken external repository
+        env:
+          APT_SCENARIO: ${{ matrix.apt }}
+        run: |
+          bad_repository=''
+          if [ "$APT_SCENARIO" = missing-release ]; then bad_repository=http://apt-404:8000/node_18.x; fi
+          docker run --rm --network omu-installer-test -e OH_MY_USAGE_TEST_BAD_APT="$bad_repository" -v "$PWD:/src:ro" ubuntu:${{ matrix.ubuntu }} sh /src/tests/integration/install-linux.sh --as-user
+      - name: Remove the repository fixture
+        if: always()
+        run: |
+          docker rm -f apt-404
+          docker network rm omu-installer-test

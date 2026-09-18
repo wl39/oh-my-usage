@@ -191,6 +191,7 @@ Antigravity, Claude, Codex, GitHub Copilot, Cursor, Devin, Grok, Ollama, OpenCod
 | 증상 | 해결 방법 |
 | --- | --- |
 | `command not found` | `zsh` 실행 또는 `~/.local/bin/oh-my-usage` 사용. `--no-shell`은 프롬프트 표시용 플러그인을 따로 불러와야 함 |
+| APT에서 외부 저장소의 Release 파일 오류 | 최신 코드로 `./install.sh` 재실행. 정상 조회된 패키지 목록으로 필수 도구 설치를 계속하며 저장소 설정·검증 방식은 유지함. 실제 패키지 설치 실패 시에는 중단함 |
 | `No module named pip` 설치 오류 | 최신 코드를 받고 `./install.sh` 재실행. 전용 환경을 자동 복구함 |
 | 상태바가 비어 있음 | 현재 프로필과 정확한 `\(user.oh_my_usage)` 값 확인 후 `start` |
 | 내부 표시가 안 나옴 | `inline status` 확인 후 `inline on`, 입력 전부 지우기. 매우 긴 테마는 오른쪽 공간을 가릴 수 있음 |

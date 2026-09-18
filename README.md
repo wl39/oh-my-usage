@@ -191,6 +191,7 @@ Start with `oh-my-usage doctor`.
 | Symptom | Fix |
 | --- | --- |
 | `command not found` | Run `zsh` or `~/.local/bin/oh-my-usage`; with `--no-shell`, load the plugin for prompt integration |
+| APT reports a third-party repository has no Release file | Update the clone and rerun `./install.sh`. It tries installing prerequisites from available indexes without changing repository settings or bypassing verification; actual package installation must still succeed. |
 | `No module named pip` during installation | Pull the latest code and rerun `./install.sh`; the private environment is repaired automatically |
 | Empty status bar | Check the profile and exact `\(user.oh_my_usage)` value, then run `start` |
 | No inline hint | Run `inline status`, then `inline on`; clear input. A very long theme may leave no right-prompt space |

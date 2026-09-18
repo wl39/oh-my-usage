@@ -179,6 +179,7 @@ git pull --ff-only
 | 现象 | 处理方法 |
 | --- | --- |
 | `command not found` | 运行 `zsh` 或 `~/.local/bin/oh-my-usage`；使用 `--no-shell` 时需自行加载提示符插件 |
+| APT 提示第三方仓库缺少 Release 文件 | 更新代码后重新运行 `./install.sh`。使用可用的软件包索引继续安装，不修改仓库或关闭验证；实际软件包安装失败时仍会中止。 |
 | 安装时出现 `No module named pip` | 更新代码后重新运行 `./install.sh`，自动修复独立 Python 环境 |
 | 状态栏为空 | 检查配置文件及准确的 `\(user.oh_my_usage)` 值，然后运行 `start` |
 | 没有终端内提示 | 查看 `inline status`，运行 `inline on` 并清空输入；过长的主题可能占满右侧空间 |

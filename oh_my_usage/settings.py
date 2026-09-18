@@ -55,13 +55,13 @@ class Settings:
     bars: bool = False
     pins_from_defaults: bool = False
 
-    def ordered_pins(self, provider):
+    def ordered_pins(self, provider, limit=2):
         prefix = provider + "."
         pins = [p for p in self.pins if p.startswith(prefix)]
         order = self.metric_order.get(provider, [])
         ordered = [p for p in order if p in pins]
         ordered += [p for p in pins if p not in ordered]
-        return sorted(ordered, key=lambda p: p in self.expanded)[:2]
+        return sorted(ordered, key=lambda p: p in self.expanded)[:limit]
 
 
 def strings(value):
@@ -87,6 +87,15 @@ def load(path=None):
     except (ValueError, TypeError, OSError, plistlib.InvalidFileException) as error:
         raise SettingsError("unsupported settings format", "OpenUsage preferences could not be decoded. "
                             "Run oh-my-usage doctor and check the installed app version and preference format.") from error
+
+
+def direct(providers):
+    """Every successfully discovered service is enabled; prefer its first two live meters."""
+    ids = tuple(p["providerId"] for p in providers)
+    order = {p["providerId"]: tuple(p["providerId"] + "." + line["id"] for line in p["lines"] if "id" in line)
+             for p in providers}
+    pins = tuple(pin for values in order.values() for pin in values)
+    return Settings(pins, ids, ids, order, ())
 
 
 def parse(prefs):

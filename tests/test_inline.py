@@ -3,7 +3,9 @@
 import base64
 import errno
 import fcntl
+import json
 import os
+import plistlib
 from pathlib import Path
 import pty
 import select
@@ -22,13 +24,18 @@ class Editor:
     def __init__(self, root, *, enabled="on", subst=True, text="Codex 42%",
                  term_program="iTerm.app", columns=240, ssh=False, extra_env=None,
                  startup=False, cold=False, preload_editor=True, empty_right=False,
-                 dynamic_prompt=False, defer_tty=False):
+                 dynamic_prompt=False, defer_tty=False, preferences=None, inline_text=None):
         self.root = root
         self.output = b""
         self.state = root / "state"
+        if preferences:
+            (root / "config").mkdir(exist_ok=True)
+            for name, value in preferences.items():
+                (root / "config" / name).write_text(value + "\n")
         if not cold:
+            extra = "auto|auto\n" + inline_text + "\n" if inline_text is not None else ""
             (root / "display").write_text(
-                f"{int(time.time())}\n{text}\n{base64.b64encode(text.encode()).decode()}\n")
+                f"{int(time.time())}\n{text}\n{base64.b64encode(text.encode()).decode()}\n{extra}")
         (root / "setup.zsh").write_text(r'''
 if [[ $TEST_DEFER_TTY == 1 ]]; then
   exec {_TEST_STDOUT}>&1 1> "$HOME/startup-output"
@@ -99,7 +106,7 @@ _oh_my_usage_async_ready() {
 ''')
         if startup:
             (root / ".zshrc").write_text('source "$TEST_SETUP"\n')
-        env = dict(os.environ, HOME=str(root), ZDOTDIR=str(root),
+        env = dict(os.environ, HOME=str(root), ZDOTDIR=str(root), OH_MY_USAGE_SOURCE="openusage",
                    PLUGIN=str(ROOT / "oh-my-usage.plugin.zsh"),
                    OH_MY_USAGE_CACHE_DIR=str(root), OH_MY_USAGE_INLINE=enabled,
                    OH_MY_USAGE_CONFIG_DIR=str(root / "config"),
@@ -184,6 +191,105 @@ class InlineTests(unittest.TestCase):
         editor = Editor(Path(temp.name), **options)
         self.addCleanup(editor.close)
         return editor
+
+    def test_left_icons_restore_theme_on_typing_finish_and_unload(self):
+        for subst in (False, True):
+            with self.subTest(subst=subst):
+                text = '✳ 72% | ◇ 58% (left) $(touch INJECTED) %F{red}'
+                editor = self.editor(subst=subst, preferences={"position": "left"}, inline_text=text)
+                state = editor.wait()
+                self.assertEqual(state[1], "theme")
+                self.assertTrue(state[7].endswith(" test> "))
+                self.assertNotIn("\n", state[7])
+                self.assertIn(text.encode(), editor.output)
+                self.assertFalse((editor.root / "INJECTED").exists())
+                editor.send(b"typing")
+                state = editor.wait("typing", visible=False)
+                self.assertEqual(state[7], "test> ")
+                editor.send(b"\x15")
+                editor.wait()
+                editor.command("PROMPT='new> '; RPROMPT='new right'")
+                editor.wait(left="new> ", theme="new right")
+                editor.command("oh-my-usage-unload")
+                editor.wait(visible=False, active="0", left="new> ", theme="new right")
+
+    def test_position_changes_reach_next_prompt_and_resize(self):
+        editor = self.editor(preferences={"position": "left"})
+        self.assertEqual(editor.wait()[1], "theme")
+        (editor.root / "config/position").write_text("right\n")
+        editor.command(":")
+        self.assertEqual(editor.wait()[7], "test> ")
+        (editor.root / "config/position").write_text("left\n")
+        editor.command(":")
+        self.assertEqual(editor.wait()[1], "theme")
+        fcntl.ioctl(editor.fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 40, 0, 0))
+        os.kill(editor.pid, signal.SIGWINCH)
+        editor.send(b"\x0c")
+        state = editor.wait()
+        self.assertIn("\ntest> ", state[7])
+        editor.send(b"x")
+        editor.wait("x", visible=False)
+        (editor.root / "config/position").write_text("$(touch INJECTED)\n")
+        editor.send(b"\x15")
+        editor.command(":")
+        editor.wait()
+        self.assertFalse((editor.root / "INJECTED").exists())
+
+    def test_inline_cache_does_not_change_iterm_status_text(self):
+        editor = self.editor(startup=True, preferences={"position": "left"},
+                             text="Codex Session 58% (left)", inline_text="◇ 58% (left)")
+        editor.until(lambda: "◇ 58% (left)".encode() in editor.output)
+        encoded = base64.b64encode(b"Codex Session 58% (left)")
+        self.assertIn(b"SetUserVar=oh_my_usage=" + encoded, editor.output)
+        self.assertEqual(editor.wait()[1], "theme")
+        self.assertFalse((editor.root / "worker").exists())
+
+    def test_after_and_above_layout_spacing_width_and_restore(self):
+        for position in ("after", "above"):
+            editor = self.editor(preferences={"position": position, "gap": "3", "indent": "4", "width": "12"},
+                                 inline_text="CX 58% | CL 72% (left)")
+            state = editor.wait()
+            self.assertEqual(state[1], "theme")
+            self.assertIn("CX 58% | CL…".encode(), editor.output)
+            if position == "after":
+                self.assertTrue(state[7].startswith("test>    "), state)
+                self.assertTrue(state[7].endswith("   "), state)
+            else:
+                self.assertTrue(state[7].startswith("    "), state)
+                self.assertTrue(state[7].endswith("\ntest> "), state)
+            editor.send(b"typing")
+            self.assertEqual(editor.wait("typing", visible=False)[7], "test> ")
+            editor.send(b"\x15")
+            editor.wait()
+            editor.command("oh-my-usage-unload")
+            editor.wait(visible=False, active="0")
+
+    def test_hidden_inline_cache_keeps_both_prompts_untouched(self):
+        editor = self.editor(preferences={"position": "left"}, inline_text="")
+        state = editor.wait(visible=False)
+        self.assertEqual(state[1], "theme")
+        self.assertEqual(state[7], "test> ")
+        self.assertNotIn(b"\x1b[38;5;245mCodex", editor.output)
+
+    def test_custom_icon_from_cli_is_literal_in_real_left_prompt(self):
+        for subst in (False, True):
+            editor = self.editor(subst=subst, preferences={"position": "left"})
+            editor.wait()
+            (editor.root / "prefs.plist").write_bytes(plistlib.dumps({
+                "openusage.enabledProviders.v1": ["codex"],
+                "openusage.layout.v1.menuBarPins": ["codex.session"]}))
+            (editor.root / "usage.json").write_text(json.dumps([{
+                "providerId": "codex", "displayName": "Codex", "fetchedAt": "2026-09-15T12:00:00Z",
+                "lines": [{"type": "progress", "label": "Session", "used": 42, "limit": 100,
+                           "format": {"kind": "percent"}}]}]))
+            editor.command('export OH_MY_USAGE_PREFERENCES="$HOME/prefs.plist"; '
+                           'oh-my-usage config style icons; oh-my-usage config icon codex \'$(touch X)\'')
+            editor.until(lambda: b"$(touch X)~ 42%" in editor.output)
+            self.assertEqual(editor.wait()[1], "theme")
+            self.assertFalse((editor.root / "X").exists())
+            editor.command("oh-my-usage config icon codex '%F{red}'")
+            editor.until(lambda: b"%F{red}~ 42%" in editor.output)
+            self.assertNotIn(b"\x1b[31m", editor.output)
 
     def test_fresh_shell_without_preloaded_editor_shows_first_prompt(self):
         editor = self.editor(startup=True, preload_editor=False)

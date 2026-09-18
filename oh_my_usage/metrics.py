@@ -32,6 +32,9 @@ def clean(value, limit=100):
 
 def row_for(descriptor, provider):
     suffix = descriptor[len(provider["providerId"]) + 1:]
+    for row in provider["lines"]:
+        if row.get("id") == suffix:
+            return row
     family = re.split(r"[.:]", provider["providerId"], maxsplit=1)[0]
     labels = LABELS.get(family + "." + suffix)
     if labels is None:

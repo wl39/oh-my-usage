@@ -1,6 +1,7 @@
 import contextlib
 import fcntl
 import io
+import json
 import os
 from pathlib import Path
 import pty
@@ -15,26 +16,33 @@ import time
 import unittest
 from unittest.mock import patch
 
-from oh_my_usage import config
+from oh_my_usage import config, preview, settings
 from oh_my_usage.__main__ import main
 from oh_my_usage.start import start
-from oh_my_usage.terminal import installed_screen
+from oh_my_usage.terminal import Console, installed_screen
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
 class CommandTests(unittest.TestCase):
+    def setUp(self):
+        source = patch.dict(os.environ, {"OH_MY_USAGE_SOURCE": "direct"})
+        source.start()
+        self.addCleanup(source.stop)
+
     def test_config_cli_saves_validated_values_and_rejects_invalid_ones(self):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"OH_MY_USAGE_CONFIG_DIR": temp}), \
              patch("oh_my_usage.cache.refresh") as refresh, contextlib.redirect_stdout(io.StringIO()):
             for name, value, saved in (("mode", "left", "left"), ("order", "Claude, Codex", "claude,codex"),
-                                        ("color", "cyan", "109")):
+                                        ("color", "cyan", "109"), ("position", "Left", "left"),
+                                        ("style", "icons", "icons"), ("icons", "ascii", "ascii")):
                 self.assertEqual(main(["config", name, value]), 0)
                 self.assertEqual(config.value(name), saved)
                 self.assertEqual((Path(temp) / name).stat().st_mode & 0o777, 0o600)
-            self.assertEqual(refresh.call_count, 2)
+            self.assertEqual(refresh.call_count, 4)
             for name, value in (("mode", "remaining"), ("order", "claude,,codex"), ("order", "codex,codex"),
-                                ("color", "256"), ("color", "$(touch INJECTED)"), ("color", "-1")):
+                                ("color", "256"), ("color", "$(touch INJECTED)"), ("color", "-1"),
+                                ("position", "$(touch INJECTED)"), ("style", "emoji"), ("icons", "png")):
                 before = (Path(temp) / name).read_text()
                 with contextlib.redirect_stderr(io.StringIO()):
                     self.assertEqual(main(["config", name, value]), 1)
@@ -42,8 +50,10 @@ class CommandTests(unittest.TestCase):
             config.save_inline("on")
             self.assertEqual(main(["config", "reset"]), 0)
             self.assertEqual(config.inline(), ("on", "saved"))
-            self.assertEqual(config.view_key(), "auto|auto")
+            self.assertEqual(config.view_key(), "auto|auto|source=direct")
             self.assertEqual(config.value("color"), "auto")
+            for name, default in config.DEFAULTS.items():
+                self.assertEqual(config.value(name), default)
 
     def test_config_menu_choices_cancellation_and_noninteractive_output(self):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"OH_MY_USAGE_CONFIG_DIR": temp}), \
@@ -170,7 +180,7 @@ class CommandTests(unittest.TestCase):
                 self.assertEqual(config.directory(), Path(temp) / "oh-my-usage")
 
     def test_start_opens_app_and_retries_api_startup(self):
-        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"OH_MY_USAGE_APP_DIR": temp}):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"OH_MY_USAGE_APP_DIR": temp, "OH_MY_USAGE_SOURCE": "openusage"}):
             app = Path(temp) / "OpenUsage.app"
             app.mkdir()
             def refresh(**kwargs):
@@ -187,10 +197,77 @@ class CommandTests(unittest.TestCase):
             sleep.assert_called_once_with(0.2)
 
     def test_start_missing_app_reports_install_instruction(self):
-        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"OH_MY_USAGE_APP_DIR": temp}), \
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"OH_MY_USAGE_APP_DIR": temp, "OH_MY_USAGE_SOURCE": "openusage"}), \
              contextlib.redirect_stderr(io.StringIO()) as output:
             self.assertEqual(main(["start"]), 1)
         self.assertIn("./install.sh", output.getvalue())
+
+
+class PreviewTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        env = patch.dict(os.environ, {"OH_MY_USAGE_CONFIG_DIR": str(self.root / "config"),
+            "OH_MY_USAGE_CACHE_DIR": str(self.root), "OH_MY_USAGE_PREFERENCES": str(self.root / "missing"),
+            "OH_MY_USAGE_INLINE_WIDTH": "", "OH_MY_USAGE_INLINE_COLOR": "245"})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def test_menu_preset_and_followup_edits_update_the_preview(self):
+        with patch("oh_my_usage.cache.refresh"), patch("sys.stdin.isatty", return_value=True), \
+             patch("builtins.input", side_effect=["9", "8", "2", "6", "2", "0"]), \
+             contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(main(["config"]), 0)
+        text = output.getvalue()
+        self.assertIn("sample data · left", text)
+        self.assertIn("✳ 72% | ◇ 58% (left)", text)
+        self.assertIn("CL 72% | CX 58% (left)", text)
+        self.assertIn("sample data · right", text)
+        self.assertEqual(config.inline(), ("on", "saved"))
+        self.assertEqual(config.value("position"), "right")
+
+    def test_cached_preview_uses_current_settings_without_fetching_or_writing(self):
+        (self.root / "usage.json").write_text(json.dumps([{
+            "providerId": "codex", "displayName": "Codex", "fetchedAt": "2026-09-15T12:00:00Z",
+            "lines": [{"type": "progress", "label": "Session", "used": 61, "limit": 100,
+                       "format": {"kind": "percent"}}]}]))
+        (self.root / "display").write_text("1\nPrevious [offline]\n\n")
+        config.save("mode", "left")
+        config.save("style", "icons")
+        before = {str(p): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        with patch("oh_my_usage.preview.settings.load", return_value=settings.Settings(
+                ("codex.session",), ("codex",), ("codex",), {}, ())), \
+             patch("oh_my_usage.preview.time.time", return_value=1789474201), \
+             patch("oh_my_usage.source.fetch") as fetch, patch("oh_my_usage.cache.refresh") as refresh:
+            text, origin = preview.content()
+        self.assertEqual(origin, "cached usage")
+        self.assertEqual(text, "◇~ 39% (left) [offline]")
+        fetch.assert_not_called()
+        refresh.assert_not_called()
+        self.assertEqual(before, {str(p): p.read_bytes() for p in self.root.rglob("*") if p.is_file()})
+
+    def test_preview_layout_color_narrow_width_and_disabled_hint(self):
+        config.save_inline("off")
+        config.save("style", "icons")
+        config.save("mode", "left")
+        config.save("color", "cyan")
+        for width in (20, 40, 80, 96):
+            for position in ("left", "right", "auto"):
+                config.save("position", position)
+                output = io.StringIO()
+                console = Console(output)
+                console.width, console.color = width, True
+                preview.show(console)
+                text = output.getvalue()
+                self.assertIn("\x1b[38;5;109m", text)
+                plain = re.sub(r"\x1b\[[0-9;]*m", "", text)
+                rows = [line for line in plain.splitlines() if line.startswith("  |")]
+                self.assertEqual(len(rows), 2 if width < 80 else 1)
+                self.assertTrue(all(preview.cells(row) <= width for row in rows), rows)
+                if width >= 80:
+                    self.assertEqual(rows[0].index("✳") < rows[0].index("~/project"), position == "left")
+                self.assertIn("Preview only:", plain)
 
 
 if __name__ == "__main__":

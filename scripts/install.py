@@ -5,11 +5,14 @@ import json
 import os
 import shlex
 import shutil
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 
 from oh_my_usage.terminal import installed_screen
+from oh_my_usage.paths import cache_directory
+from oh_my_usage.files import atomic_write
 
 ROOT = Path(__file__).resolve().parent.parent
 START = "# >>> oh-my-usage >>>"
@@ -56,7 +59,9 @@ def remove_legacy_profile(manifest):
             p.unlink()
 
 
-def install(prefix, home, shell=True):
+def install(prefix, home, shell=True, mode="direct", dependencies=False):
+    if shell and not shutil.which("zsh"):
+        raise ValueError("Install zsh for prompt integration, or use --no-shell for CLI-only installation")
     rc = Path(os.environ.get("ZDOTDIR", str(home))) / ".zshrc"
     # Preflight before modifying anything, including an unrelated existing directory.
     without_block(rc.read_text() if rc.exists() else "")
@@ -68,21 +73,37 @@ def install(prefix, home, shell=True):
         raise ValueError("ZDOTDIR changed; uninstall the previous installation first")
     remove_legacy_profile(previous)
     prefix.mkdir(parents=True, exist_ok=True)
+    # A failed dependency download remains a recognized, retryable installation.
+    if not marker.exists():
+        marker.write_text(json.dumps({"rc": str(rc), "shell": False}))
     for name in ("oh_my_usage", "bin", "zsh"):
         shutil.copytree(ROOT / name, prefix / name, dirs_exist_ok=True,
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     # Explicit files keep local notes, previews, and test tools out of installations.
     for name in ("oh-my-usage.plugin.zsh", "install.sh", "README.md", "LICENSE",
-                 "scripts/install.py", "docs/README.ko.md", "docs/README.zh-CN.md"):
+                 "scripts/install.py", "requirements.txt", "docs/providers.md", "docs/README.ko.md", "docs/README.zh-CN.md"):
         (prefix / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / name, prefix / name)
-    (prefix / "python-path").write_text(sys.executable + "\n")
-    cache = Path(os.environ.get("OH_MY_USAGE_CACHE_DIR", str(home / "Library/Caches/oh-my-usage"))).expanduser()
+    python = sys.executable
+    if dependencies:
+        environment = prefix / ".venv"
+        if not (environment / "bin/python").exists():
+            subprocess.run([sys.executable, "-m", "venv", str(environment)], check=True)
+        python = str(environment / "bin/python")
+        subprocess.run([python, "-m", "pip", "install", "--disable-pip-version-check", "-r", str(prefix / "requirements.txt")], check=True)
+    (prefix / "python-path").write_text(python + "\n")
+    cache = cache_directory(home)
     marker.write_text(json.dumps({"rc": str(rc), "cache": str(cache),
                                   "shell": shell or previous.get("shell", False)}))
     if shell:
         quoted = shlex.quote(str(prefix / "oh-my-usage.plugin.zsh"))
         write_shell(rc, f"{START}\n[[ -r {quoted} ]] && source {quoted}\n{END}\n")
+    settings = Path(os.environ.get("OH_MY_USAGE_CONFIG_DIR") or
+                    Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config") / "oh-my-usage")
+    settings.mkdir(parents=True, exist_ok=True, mode=0o700)
+    atomic_write(settings / "source", ("direct" if mode == "direct" else "openusage") + "\n")
+    if mode == "direct" and not (settings / "inline").exists():
+        atomic_write(settings / "inline", "on\n")
     installed_screen(prefix, shell or previous.get("shell", False))
 
 
@@ -103,7 +124,7 @@ def uninstall(prefix):
     if manifest.get("cache"):
         cache = Path(manifest["cache"])
         # Custom cache directories may contain unrelated files; only remove ours.
-        for name in ("display", "usage.json", "lock"):
+        for name in ("display", "usage.json", "usage-source", "lock"):
             (cache / name).unlink(missing_ok=True)
         try:
             cache.rmdir()
@@ -120,11 +141,12 @@ def uninstall(prefix):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=("full", "existing", "uninstall"))
+    parser.add_argument("mode", choices=("direct", "full", "existing", "uninstall"))
     default_prefix = ROOT if (ROOT / ".oh-my-usage-install").is_file() else Path.home() / ".local/share/oh-my-usage"
     parser.add_argument("--prefix", type=Path, default=default_prefix)
     parser.add_argument("--no-profile", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--no-shell", action="store_true")
+    parser.add_argument("--with-dependencies", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     prefix = args.prefix.expanduser().resolve()
     try:
@@ -133,8 +155,8 @@ def main():
         if args.mode == "uninstall":
             uninstall(prefix)
         else:
-            install(prefix, Path.home(), not args.no_shell)
-    except (OSError, ValueError, KeyError) as error:
+            install(prefix, Path.home(), not args.no_shell, args.mode, args.with_dependencies)
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
         parser.exit(1, f"oh-my-usage: {error}\n")
 
 

@@ -6,10 +6,12 @@ import subprocess
 import time
 from pathlib import Path
 
-from . import cache, source
+from . import cache, config, source
 
 
 def start():
+    if config.source() == "direct":
+        return cache.refresh(force=True)
     app_dir = os.environ.get("OH_MY_USAGE_APP_DIR")
     directories = [Path(app_dir).expanduser()] if app_dir else [
         Path("/Applications"), Path.home() / "Applications"]

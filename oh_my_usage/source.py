@@ -20,13 +20,15 @@ def validate(payload):
         if not isinstance(lines, list) or not all(isinstance(v, dict) for v in lines):
             raise ValueError("Invalid metrics")
         # Keep only fields needed for rendering. Never store plans, accounts, or charts.
-        fields = ("type", "label", "used", "limit", "format", "value", "text")
+        fields = ("type", "label", "used", "limit", "format", "value", "text", "id", "resetsAt",
+                  "periodDurationMs", "numericValue", "unit")
         result.append({
             "providerId": provider["providerId"],
             "displayName": provider["displayName"],
             "fetchedAt": provider["fetchedAt"],
             "lines": [{k: line[k] for k in fields if k in line} for line in lines
                       if line.get("type") in ("progress", "text", "badge")],
+            **({"status": provider["status"]} if isinstance(provider.get("status"), str) else {}),
         })
     return result
 

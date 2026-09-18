@@ -55,6 +55,24 @@ def write_prefs(path, value=None):
 
 
 class RenderingTests(unittest.TestCase):
+    def test_icons_show_remaining_percent_and_identify_multiple_periods(self):
+        self.assertEqual(render(usage(), replace(prefs(), remaining=True, bars=True), NOW,
+                                style="icons"), "◇ W:90%/S:58% (left)")
+        self.assertEqual(render(usage(), replace(prefs(), pins=("codex.session",), remaining=True),
+                                NOW, style="icons", icons="ascii"), "CX 58% (left)")
+
+    def test_icons_preserve_staleness_unknown_providers_and_nonpercentage_data(self):
+        data = usage()
+        data[0].update(providerId="new", displayName="New\x1b\nProvider")
+        p = replace(prefs(), pins=("new.session",), enabled=("new",), remaining=True, bars=True)
+        data[0]["lines"][0].update(used=25, limit=50, format={"kind": "dollars"})
+        self.assertEqual(render(data, p, NOW + 601, True, style="icons"),
+                         "NewProvider~ 50% (left) [offline]")
+        data[0]["lines"][0] = {"type": "text", "label": "Session", "value": "$5.00"}
+        self.assertEqual(render(data, p, NOW, style="icons"), "NewProvider $5.00 (left)")
+        data[0]["lines"][0] = {"type": "progress", "label": "Session", "used": None, "limit": 100}
+        self.assertEqual(render(data, p, NOW, style="icons"), "OpenUsage: no pinned data")
+
     def test_provider_label_aliases(self):
         for descriptor, label in (("claude.extra", "Extra usage spent"),
                                   ("cursor.auto", "Cursor Models"),
@@ -133,7 +151,7 @@ class CacheTests(unittest.TestCase):
         self.preferences = Path(self.temp.name) / "preferences.plist"
         write_prefs(self.preferences)
         self.fetch = Mock(return_value=usage())
-        env = patch.dict(os.environ, {"OH_MY_USAGE_CONFIG_DIR": str(Path(self.temp.name) / "config")})
+        env = patch.dict(os.environ, {"OH_MY_USAGE_CONFIG_DIR": str(Path(self.temp.name) / "config"), "OH_MY_USAGE_SOURCE": "openusage"})
         env.start()
         self.addCleanup(env.stop)
 
@@ -185,6 +203,21 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(self.fetch.call_count, 1)
         self.refresh(now=NOW + 30)
         self.assertEqual(self.fetch.call_count, 2)
+
+    def test_icon_cache_is_separate_from_status_and_reformats_without_fetch(self):
+        self.refresh(now=NOW)
+        config.save("style", "icons")
+        config.save("mode", "left")
+        self.assertEqual(self.refresh(now=NOW + 1), "Codex Weekly 90%/Session 58% (left)")
+        lines = (self.root / "display").read_text().splitlines()
+        self.assertEqual(base64.b64decode(lines[2]).decode(), lines[1])
+        self.assertEqual(lines[3], "left|auto|icons|unicode")
+        self.assertEqual(lines[4], "◇ W:90%/S:58% (left)")
+        config.save("icons", "ascii")
+        self.refresh(now=NOW + 2)
+        self.assertIn("CX W:90%/S:58%", (self.root / "display").read_text())
+        self.assertEqual(self.fetch.call_count, 1)
+        self.assertEqual(cache.display(self.root)[0], NOW)
 
     def test_saved_order_keeps_other_enabled_providers_and_offline_marker(self):
         providers = []
@@ -264,9 +297,10 @@ class CacheTests(unittest.TestCase):
 
     def test_private_cache_and_shell_payload(self):
         text = self.refresh(now=NOW)
-        stamp, plain, encoded, key = (self.root / "display").read_text().splitlines()
+        stamp, plain, encoded, key, inline = (self.root / "display").read_text().splitlines()
         self.assertEqual(key, "auto|auto")
         self.assertEqual(plain, text)
+        self.assertEqual(inline, text)
         self.assertEqual(base64.b64decode(encoded).decode(), text)
         self.assertEqual(int(stamp), NOW)
         self.assertEqual(self.root.stat().st_mode & 0o777, 0o700)
@@ -385,9 +419,9 @@ class InstallTests(unittest.TestCase):
                                          OH_MY_USAGE_INLINE="off", OH_MY_USAGE_DISPLAY="off"),
                                 cwd=self.home, capture_output=True, text=True, timeout=5)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, __version__ + "\ninline: off (environment)\n")
+        self.assertEqual(result.stdout, __version__ + "\ninline: on (saved)\n")
         self.assertEqual({p.name for p in (self.prefix / "docs").iterdir()},
-                         {"README.ko.md", "README.zh-CN.md"})
+                         {"README.ko.md", "README.zh-CN.md", "providers.md"})
         self.assertFalse((self.prefix / "scripts/check.sh").exists())
         self.assertFalse((self.prefix / "tests").exists())
 
@@ -450,7 +484,7 @@ class InstallTests(unittest.TestCase):
 
     def test_installed_uninstaller_and_cache_cleanup(self):
         install.install(self.prefix, self.home)
-        directory = self.home / "Library/Caches/oh-my-usage"
+        directory = Path(json.loads((self.prefix / ".oh-my-usage-install").read_text())["cache"])
         directory.mkdir(parents=True)
         for name in ("display", "usage.json", "lock", "unrelated"):
             (directory / name).write_text("test")
@@ -510,6 +544,8 @@ _oh_my_usage_emit U0hPVUxELU5PVC1TSF9PVw==
             binaries.mkdir()
             log = root / "calls"
             stubs = {
+                "uname": '#!/bin/sh\necho Darwin\n',
+                "sw_vers": '#!/bin/sh\necho 15.0\n',
                 "brew": '#!/bin/zsh\nprint -r -- "$*" >> "$CALLS"\nmkdir -p "$OH_MY_USAGE_APP_DIR/OpenUsage.app"\n',
                 "open": '#!/bin/zsh\nprint -r -- "open $*" >> "$CALLS"\n',
             }
@@ -518,6 +554,7 @@ _oh_my_usage_emit U0hPVUxELU5PVC1TSF9PVw==
                 (binaries / name).chmod(0o755)
             env = dict(os.environ, OH_MY_USAGE_APP_DIR=str(appdir), OH_MY_USAGE_PYTHON=sys.executable,
                        OH_MY_USAGE_CACHE_DIR=str(root / "cache"),
+                       OH_MY_USAGE_CONFIG_DIR=str(root / "config"),
                        ZDOTDIR=str(root), CALLS=str(log), PATH=str(binaries) + ":" + os.environ["PATH"])
             prefix = root / "install"
             args = ["--no-shell", "--no-profile", "--prefix", str(prefix)]
@@ -526,7 +563,7 @@ _oh_my_usage_emit U0hPVUxELU5PVC1TSF9PVw==
                                      capture_output=True, text=True)
             self.assertNotEqual(missing.returncode, 0)
             self.assertFalse(log.exists())
-            for script in ("install.sh", "install-full.sh", "install-existing.sh"):
+            for script in ("install-full.sh", "install-full.sh", "install-existing.sh"):
                 result = subprocess.run([str(ROOT / script), *args], env=env,
                                         capture_output=True, text=True, timeout=10)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -539,7 +576,7 @@ _oh_my_usage_emit U0hPVUxELU5PVC1TSF9PVw==
     def run_pty(self, script, root, **extra):
         master, slave = pty.openpty()
         env = dict(os.environ, PLUGIN=str(ROOT / "oh-my-usage.plugin.zsh"),
-                   OH_MY_USAGE_CACHE_DIR=str(root), OH_MY_USAGE_CONFIG_DIR=str(root / "config"), TERM_PROGRAM="iTerm.app", TMUX="", STY="")
+                   OH_MY_USAGE_CACHE_DIR=str(root), OH_MY_USAGE_CONFIG_DIR=str(root / "config"), OH_MY_USAGE_SOURCE="openusage", TERM_PROGRAM="iTerm.app", TMUX="", STY="")
         env.update(extra)
         try:
             result = subprocess.run(["zsh", "-dfi", "-c", script], env=env, cwd=root,
@@ -657,7 +694,7 @@ _OH_MY_USAGE_LOADED=1
 RPROMPT='old usage + theme'
 oh-my-usage-unload() { RPROMPT=theme; unset _OH_MY_USAGE_LOADED; }
 source "$PLUGIN"
-[[ $RPROMPT == theme && $_OH_MY_USAGE_VERSION == 0.6.1 ]]
+[[ $RPROMPT == theme && $_OH_MY_USAGE_VERSION == 0.7.0 ]]
 '''
         with tempfile.TemporaryDirectory() as temp:
             self.assertEqual(self.run_pty(script, Path(temp)), b"")

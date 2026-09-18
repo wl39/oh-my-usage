@@ -9,6 +9,11 @@ from .files import atomic_write
 
 COLORS = {"gray": 245, "cyan": 109, "green": 108, "blue": 110,
           "purple": 139, "yellow": 180, "red": 174, "white": 250}
+DEFAULTS = {"position": "auto", "style": "text", "icons": "unicode",
+            "gap": "1", "indent": "0", "width": "auto", "metric-labels": "auto",
+            "mode-label": "on", "separator": "pipe"}
+MAP_DEFAULTS = {"icon-map": "{}", "providers": "{}", "metrics": "{}"}
+RENDER_DEFAULTS = {"metric-labels": "auto", "mode-label": "on", "separator": "pipe", **MAP_DEFAULTS}
 
 
 def read(name, default="auto"):
@@ -21,13 +26,31 @@ def read(name, default="auto"):
 
 def validate(name, value):
     value = value.strip().lower()
+    choices = {"position": ("auto", "left", "right", "after", "above"),
+               "source": ("direct", "openusage"),
+               "style": ("text", "icons"), "icons": ("unicode", "ascii"),
+               "metric-labels": ("auto", "on", "off"), "mode-label": ("on", "off"),
+               "separator": ("pipe", "dot", "space")}
+    if name in choices:
+        if value == "auto":
+            return DEFAULTS.get(name, "direct")
+        if value in choices[name]:
+            return value
+        raise ValueError(name + ": " + ", ".join(choices[name]))
+    if name in ("gap", "indent", "width"):
+        if value == "auto":
+            return DEFAULTS[name]
+        low, high = {"gap": (0, 8), "indent": (0, 20), "width": (1, 240)}[name]
+        if value.isascii() and value.isdigit() and low <= int(value) <= high:
+            return str(int(value))
+        raise ValueError(f"{name}: {low}–{high}, or auto")
     if name == "mode" and value in ("auto", "used", "left"):
         return value
     if name == "order":
         if value == "auto":
             return value
         ids = [part.strip() for part in value.split(",")]
-        if (all(re.fullmatch(r"[a-z][a-z0-9_-]*", part) for part in ids)
+        if (all(re.fullmatch(r"[a-z][a-z0-9_.:-]*", part) for part in ids)
                 and len(ids) == len(set(ids))):
             return ",".join(ids)
     if name == "color":
@@ -44,10 +67,12 @@ def validate(name, value):
 
 
 def value(name):
+    if name == "source":
+        return source()
     try:
-        return validate(name, read(name))
+        return validate(name, read(name, DEFAULTS.get(name, "auto")))
     except ValueError:
-        return "auto"
+        return DEFAULTS.get(name, "auto")
 
 
 def save(name, setting):
@@ -58,13 +83,32 @@ def save(name, setting):
 
 
 def reset():
-    for name in ("mode", "order", "color"):
+    for name in ("mode", "order", "color", *DEFAULTS, *MAP_DEFAULTS):
         (directory() / name).unlink(missing_ok=True)
 
 
 def view_key():
     # Kept in the display file so every tab notices a changed presentation.
-    return read("mode") + "|" + read("order")
+    key = read("mode") + "|" + read("order")
+    if source() == "direct":
+        key += "|source=direct"
+    if value("style") == "icons":
+        key += "|icons|" + value("icons")
+    for name, default in RENDER_DEFAULTS.items():
+        setting = read(name, default)
+        if setting != default:
+            key += "|" + name + "=" + setting
+    return key
+
+
+def color():
+    saved = value("color")
+    if saved != "auto":
+        return saved
+    fallback = os.environ.get("OH_MY_USAGE_INLINE_COLOR", "245")
+    if fallback.isascii() and fallback.isdigit() and len(fallback) <= 3 and int(fallback) <= 255:
+        return str(int(fallback))
+    return "245"
 
 
 def apply(prefs):
@@ -78,6 +122,17 @@ def apply(prefs):
 def directory():
     base = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
     return Path(os.environ.get("OH_MY_USAGE_CONFIG_DIR") or base / "oh-my-usage").expanduser()
+
+
+def source():
+    override = os.environ.get("OH_MY_USAGE_SOURCE")
+    saved = read("source", "")
+    if override in ("direct", "openusage"):
+        return override
+    if saved in ("direct", "openusage"):
+        return saved
+    # An explicitly supplied legacy preference file is also an explicit legacy source.
+    return "openusage" if os.environ.get("OH_MY_USAGE_PREFERENCES") else "direct"
 
 
 def inline():

@@ -1,0 +1,2 @@
+# Used for Ollama's Ed25519 request signatures. Other adapters use the standard library.
+cryptography>=43

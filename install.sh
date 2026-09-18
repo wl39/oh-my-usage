@@ -1,72 +1,51 @@
-#!/bin/zsh
-# Install prerequisites only when requested; the reader has no pip dependencies.
-emulate -LR zsh
+#!/bin/sh
+# Independent macOS/Linux installation; OpenUsage integration is explicitly optional.
 set -eu
-typeset root=${0:A:h}
-typeset mode=full
-if (( $# )) && [[ $1 == (full|existing|uninstall) ]]; then
-  mode=$1
-  shift
+root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+mode=direct
+case ${1:-} in direct|full|existing|uninstall) mode=$1; shift ;; esac
+case ${1:-} in --help|-h)
+  echo 'Usage: ./install.sh [direct|full|existing|uninstall] [--no-shell] [--prefix PATH]'
+  echo 'Default: independent macOS/Linux install. full/existing opt into OpenUsage (macOS).'
+  exit 0 ;;
+esac
+python=${OH_MY_USAGE_PYTHON:-python3}
+if [ "$mode" = uninstall ] && [ -z "${OH_MY_USAGE_PYTHON:-}" ]; then
+  prefix="$HOME/.local/share/oh-my-usage"
+  [ ! -f "$root/.oh-my-usage-install" ] || prefix=$root
+  next_prefix=no
+  for argument in "$@"; do
+    if [ "$next_prefix" = yes ]; then prefix=$argument; next_prefix=no; fi
+    [ "$argument" != --prefix ] || next_prefix=yes
+  done
+  if [ -r "$prefix/python-path" ]; then IFS= read -r python < "$prefix/python-path"; fi
 fi
-if [[ ${1:-} == --help || ${1:-} == -h ]]; then
-  print 'Usage: ./install.sh [full|existing|uninstall] [--no-shell] [--prefix PATH]'
-  print 'Default: reuse OpenUsage if installed, otherwise install it through Homebrew.'
-  exit 0
-fi
-typeset -a forwarded=("$@")
-typeset prefix="$HOME/.local/share/oh-my-usage"
-[[ -f "$root/.oh-my-usage-install" ]] && prefix=$root
-while (( $# )); do
-  case $1 in
-    --no-shell|--no-profile) shift ;;
-    --prefix) (( $# >= 2 )) || { print -u2 '--prefix needs a path'; exit 2; }; prefix=$2; shift 2 ;;
-    *) print -u2 "Unknown option: $1"; exit 2 ;;
-  esac
-done
-[[ $(uname -s) == Darwin ]] || { print -u2 'oh-my-usage requires macOS (OpenUsage is a macOS app).'; exit 1; }
-
-typeset app=''
-typeset -a candidates=(/Applications/OpenUsage.app "$HOME/Applications/OpenUsage.app")
-[[ -n ${OH_MY_USAGE_APP_DIR:-} ]] && candidates=("$OH_MY_USAGE_APP_DIR/OpenUsage.app")
-for candidate in "${candidates[@]}"; do
-  [[ -d $candidate ]] && app=$candidate && break
-done
-typeset brew_cmd=${commands[brew]:-}
-[[ -z $brew_cmd && -x /opt/homebrew/bin/brew ]] && brew_cmd=/opt/homebrew/bin/brew
-[[ -z $brew_cmd && -x /usr/local/bin/brew ]] && brew_cmd=/usr/local/bin/brew
-
-need_brew() {
-  [[ -n $brew_cmd ]] && return 0
-  print -u2 'Install Homebrew from https://brew.sh first, then rerun this command.'
-  return 1
-}
-
-if [[ $mode == existing && -z $app ]]; then
-  print -u2 'OpenUsage was not found. Run ./install.sh to install it.'
+if ! "$python" -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null; then
+  echo 'Install Python 3.9+ first (Linux: python3 and python3-venv; macOS: brew install python).' >&2
   exit 1
 fi
-if [[ $mode == full && -z $app ]]; then
-  typeset os_version=$(sw_vers -productVersion)
-  (( ${os_version%%.*} >= 15 )) || { print -u2 'OpenUsage requires macOS 15 or later.'; exit 1; }
-  need_brew
-  typeset app_dir=${OH_MY_USAGE_APP_DIR:-/Applications}
-  "$brew_cmd" install --cask --appdir "$app_dir" openusage
+app=''
+if [ "$mode" = full ] || [ "$mode" = existing ]; then
+  [ "$(uname -s)" = Darwin ] || { echo 'OpenUsage mode requires macOS; use ./install.sh for independent Linux support.' >&2; exit 1; }
+  app_dir=${OH_MY_USAGE_APP_DIR:-/Applications}
   app="$app_dir/OpenUsage.app"
-  [[ -d $app ]] || { print -u2 'OpenUsage installation did not finish.'; exit 1; }
-fi
-
-typeset python=${OH_MY_USAGE_PYTHON:-${commands[python3]:-}}
-if [[ $mode == uninstall && -r "$prefix/python-path" && -z ${OH_MY_USAGE_PYTHON:-} ]]; then
-  python=$(<"$prefix/python-path")
-fi
-if [[ -z $python ]] || ! "$python" -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null; then
-  [[ $mode != uninstall ]] || { print -u2 'Python 3.9+ is needed for uninstall.'; exit 1; }
-  need_brew
-  "$brew_cmd" install python
-  python="$("$brew_cmd" --prefix)/bin/python3"
+  if [ ! -d "$app" ] && [ -z "${OH_MY_USAGE_APP_DIR:-}" ] && [ -d "$HOME/Applications/OpenUsage.app" ]; then
+    app="$HOME/Applications/OpenUsage.app"
+  fi
+  if [ ! -d "$app" ]; then
+    [ "$mode" = full ] || { echo 'OpenUsage was not found; use ./install-full.sh or independent ./install.sh.' >&2; exit 1; }
+    version=$(sw_vers -productVersion)
+    [ "${version%%.*}" -ge 15 ] || { echo 'OpenUsage requires macOS 15 or later.' >&2; exit 1; }
+    brew_cmd=$(command -v brew || true)
+    [ -n "$brew_cmd" ] || { echo 'Install Homebrew from https://brew.sh first.' >&2; exit 1; }
+    "$brew_cmd" install --cask --appdir "$app_dir" openusage
+    [ -d "$app" ] || { echo 'OpenUsage installation did not finish.' >&2; exit 1; }
+  fi
 fi
 export PYTHONDONTWRITEBYTECODE=1
-PYTHONPATH="$root" "$python" "$root/scripts/install.py" "$mode" "${forwarded[@]}"
-if [[ $mode != uninstall ]]; then
-  open "$app"
+if [ "$mode" = direct ]; then
+  PYTHONPATH="$root" "$python" "$root/scripts/install.py" "$mode" --with-dependencies "$@"
+else
+  PYTHONPATH="$root" "$python" "$root/scripts/install.py" "$mode" "$@"
 fi
+if [ -n "$app" ]; then open "$app"; fi

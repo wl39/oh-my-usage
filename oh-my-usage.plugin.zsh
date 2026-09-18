@@ -1,13 +1,17 @@
-# iTerm2 status-bar transport, with an optional empty-input right prompt.
+# iTerm2 status-bar transport, with an optional empty-input usage hint.
 [[ -o interactive ]] || return 0
 if (( ${+_OH_MY_USAGE_LOADED} )); then
-  [[ ${_OH_MY_USAGE_VERSION:-} == 0.6.1 ]] && return 0
+  [[ ${_OH_MY_USAGE_VERSION:-} == 0.7.0 ]] && return 0
   # Restore the theme before replacing a previously loaded version.
   (( ${+functions[oh-my-usage-unload]} )) && oh-my-usage-unload
 fi
-typeset -g _OH_MY_USAGE_LOADED=1 _OH_MY_USAGE_VERSION=0.6.1
+typeset -g _OH_MY_USAGE_LOADED=1 _OH_MY_USAGE_VERSION=0.7.0
 typeset -g _OH_MY_USAGE_ROOT=${${(%):-%x}:A:h}
-typeset -g _OH_MY_USAGE_CACHE=${OH_MY_USAGE_CACHE_DIR:-$HOME/Library/Caches/oh-my-usage}
+if [[ $OSTYPE == darwin* ]]; then
+  typeset -g _OH_MY_USAGE_CACHE=${OH_MY_USAGE_CACHE_DIR:-$HOME/Library/Caches/oh-my-usage}
+else
+  typeset -g _OH_MY_USAGE_CACHE=${OH_MY_USAGE_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oh-my-usage}
+fi
 typeset -g _OH_MY_USAGE_CONFIG=${OH_MY_USAGE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/oh-my-usage}
 typeset -g _OH_MY_USAGE_NEXT=0 OH_MY_USAGE_TEXT=''
 typeset -g _OH_MY_USAGE_ENCODED='?'
@@ -104,6 +108,8 @@ oh-my-usage-unload() {
   _oh_my_usage_emit ''
   unset _OH_MY_USAGE_LOADED _OH_MY_USAGE_VERSION _OH_MY_USAGE_ENCODED OH_MY_USAGE_TEXT
   unset _OH_MY_USAGE_INLINE_SESSION _OH_MY_USAGE_INLINE_MODE _OH_MY_USAGE_INLINE_ORIGIN
+  unset _OH_MY_USAGE_INLINE_POSITION
+  unset _OH_MY_USAGE_INLINE_GAP _OH_MY_USAGE_INLINE_INDENT _OH_MY_USAGE_INLINE_WIDTH
 }
 
 add-zsh-hook precmd _oh_my_usage_precmd

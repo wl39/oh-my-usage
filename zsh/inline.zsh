@@ -81,19 +81,31 @@ _oh_my_usage_inline_update() {
   [[ $PROMPT == "$_OH_MY_USAGE_INLINE_LEFT_APPLIED" ]] || _OH_MY_USAGE_INLINE_LEFT_BASE=$PROMPT
   local desired=$_OH_MY_USAGE_INLINE_BASE previous_render=$_OH_MY_USAGE_INLINE_RENDERED
   local desired_left=$_OH_MY_USAGE_INLINE_LEFT_BASE hint
+  local above=0 indent=0 padding='' gap=''
+  (( COLUMNS < 80 )) || [[ $_OH_MY_USAGE_INLINE_POSITION == above ]] && above=1
+  if (( above )) || [[ $_OH_MY_USAGE_INLINE_POSITION == left ]]; then
+    indent=$_OH_MY_USAGE_INLINE_INDENT
+    (( indent > COLUMNS - 3 )) && indent=$(( COLUMNS > 3 ? COLUMNS - 3 : 0 ))
+  fi
+  repeat $indent; do padding+=' '; done
+  repeat $_OH_MY_USAGE_INLINE_GAP; do gap+=' '; done
   if [[ $_OH_MY_USAGE_INLINE_MODE == on && ${OH_MY_USAGE_DISPLAY:-status} != off &&
         $CONTEXT == start && -z $BUFFER && -z $PREBUFFER ]]; then
     if [[ $_OH_MY_USAGE_INLINE_VISIBLE == 0 || $_OH_MY_USAGE_INLINE_COLUMNS != $COLUMNS ]]; then
       _oh_my_usage_color_load
-      local stamp text=$OH_MY_USAGE_TEXT color=$_OH_MY_USAGE_INLINE_COLOR
-      local limit=$(( COLUMNS < 80 ? COLUMNS - 2 : COLUMNS / 2 ))
-      local width=${OH_MY_USAGE_INLINE_WIDTH:-$limit}
+      local stamp encoded key inline_text text=$OH_MY_USAGE_TEXT color=$_OH_MY_USAGE_INLINE_COLOR
+      local limit=$(( (above ? COLUMNS - 2 : COLUMNS / 2) - indent ))
+      local width=$_OH_MY_USAGE_INLINE_WIDTH
+      [[ $width == auto ]] && width=${OH_MY_USAGE_INLINE_WIDTH:-$limit}
       [[ $width == <-> && ${#width} -le 4 ]] || width=$limit
       (( width > limit )) && width=$limit
       (( width < 1 )) && width=1
       # Read once when becoming visible; no disk read for each typed character.
       if [[ -r "$_OH_MY_USAGE_CACHE/display" ]]; then
-        { IFS= read -r stamp; IFS= read -r text; } < "$_OH_MY_USAGE_CACHE/display"
+        { IFS= read -r stamp; IFS= read -r text
+          IFS= read -r encoded; IFS= read -r key
+          IFS= read -r inline_text && text=$inline_text
+        } < "$_OH_MY_USAGE_CACHE/display"
       fi
       # Literal percent signs cannot introduce prompt formatting directives.
       _OH_MY_USAGE_INLINE_RENDERED=${text:+"%F{$color}%${width}>…>${text//\%/%%}%>>%f"}
@@ -109,11 +121,15 @@ _oh_my_usage_inline_update() {
       fi
       # A phone's long theme can leave no space for any right prompt.
       # Put the hint on its own prompt line, never in the editable buffer.
-      if (( COLUMNS < 80 )); then
-        desired_left=$hint$'\n'$_OH_MY_USAGE_INLINE_LEFT_BASE
+      if (( above )); then
+        desired_left=$padding$hint$'\n'$_OH_MY_USAGE_INLINE_LEFT_BASE
+      elif [[ $_OH_MY_USAGE_INLINE_POSITION == left ]]; then
+        desired_left=$padding$hint$gap$_OH_MY_USAGE_INLINE_LEFT_BASE
+      elif [[ $_OH_MY_USAGE_INLINE_POSITION == after ]]; then
+        desired_left=$_OH_MY_USAGE_INLINE_LEFT_BASE$gap$hint$gap
       else
         desired=$hint
-        [[ -n $_OH_MY_USAGE_INLINE_BASE ]] && desired+=" $_OH_MY_USAGE_INLINE_BASE"
+        [[ -n $_OH_MY_USAGE_INLINE_BASE ]] && desired+=$gap$_OH_MY_USAGE_INLINE_BASE
       fi
     fi
   else

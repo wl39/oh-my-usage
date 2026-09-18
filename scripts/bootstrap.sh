@@ -17,6 +17,31 @@ omu_python_ready() {
   "$python" -c 'import sys, ssl, sqlite3, venv, ensurepip; ensurepip.version(); sys.exit(sys.version_info < (3, 9))' >/dev/null 2>&1
 }
 
+omu_python_base_ready() {
+  "$python" -c 'import sys, ssl, sqlite3; sys.exit(sys.version_info < (3, 9))' >/dev/null 2>&1
+}
+
+omu_select_python() {
+  if [ -n "${OH_MY_USAGE_PYTHON:-}" ]; then
+    if ! omu_python_base_ready; then
+      echo 'OH_MY_USAGE_PYTHON must name a working Python 3.9+ with ssl and sqlite3. Correct or unset it before installing; no system packages have been changed.' >&2
+      return 1
+    fi
+    return 0
+  fi
+  omu_python_ready && return 0
+  original_python=$python
+  # A pyenv/conda shim earlier in PATH may be incomplete even though a suitable
+  # system Python already exists. Check it before requesting any system packages.
+  for python in /usr/bin/python3 /opt/homebrew/bin/python3 /usr/local/bin/python3; do
+    if omu_python_ready; then
+      echo "Using $python for the private environment."
+      return 0
+    fi
+  done
+  python=$original_python
+}
+
 omu_apt_install() {
   # APT retains indexes from healthy repositories even when another repository
   # has a missing Release file. Do not edit the user's sources or disable checks.
@@ -30,7 +55,7 @@ omu_apt_install() {
     echo 'oh-my-usage: APT could not refresh every repository. Trying prerequisite installation from the available package indexes.' >&2
     echo 'Repository settings and normal APT verification are unchanged.' >&2
   fi
-  if omu_as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@"; then
+  if omu_as_root env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=60 install -y --no-install-recommends "$@"; then
     return 0
   else
     apt_status=$?
@@ -40,6 +65,7 @@ omu_apt_install() {
 }
 
 omu_bootstrap() {
+  omu_select_python
   need_python=no need_zsh=no need_ps=no need_ca=no
   omu_python_ready || need_python=yes
   if [ "$with_shell" = yes ] && ! command -v zsh >/dev/null 2>&1; then need_zsh=yes; fi
@@ -61,7 +87,14 @@ omu_bootstrap() {
     fi
   elif command -v apt-get >/dev/null 2>&1; then
     set --
-    [ "$need_python" = no ] || set -- "$@" python3 python3-venv python3-pip
+    if [ "$need_python" = yes ]; then
+      if [ -n "${OH_MY_USAGE_PYTHON:-}" ]; then
+        python_version=$("$python" -c 'import sys; print("%s.%s" % sys.version_info[:2])')
+        set -- "$@" "python$python_version-venv"
+      else
+        set -- "$@" python3 python3-venv python3-pip
+      fi
+    fi
     [ "$need_zsh" = no ] || set -- "$@" zsh
     [ "$need_ps" = no ] || set -- "$@" procps
     [ "$need_ca" = no ] || set -- "$@" ca-certificates

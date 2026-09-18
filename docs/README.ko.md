@@ -1,4 +1,4 @@
-# oh-my-usage · v0.7.0
+# oh-my-usage · v0.7.1
 
 **[English](../README.md) · [简体中文](README.zh-CN.md) · [한국어](README.ko.md)**
 
@@ -161,7 +161,7 @@ oh-my-usage config icons unicode
 
 클라이언트가 설치·로그인된 macOS 또는 Linux 계정으로 SSH 접속해 zsh를 사용하면 됩니다. 사용량은 해당 호스트에서 읽고 휴대폰에는 프롬프트만 표시합니다. API 포트 전달이나 휴대폰의 iTerm2는 필요하지 않습니다. 다른 서버로 로그인·사용량이 자동 복사되지는 않습니다.
 
-## v0.7.0으로 업데이트
+## v0.7.1으로 업데이트
 
 내려받은 저장소 폴더에서 실행합니다.
 
@@ -171,6 +171,8 @@ git pull --ff-only
 ```
 
 대화형 터미널에서는 설치기가 첫 조회 후 준비된 zsh로 진입합니다. 처음에 사용자 지정 `--prefix`나 `--no-shell`을 썼다면 같은 옵션을 붙이세요.
+
+**v0.7.1 설치 보강:** 불완전한 가상환경·서명 모듈 복구, 외부 APT 저장소 오류 처리, 실제 zsh 설정 경로 감지, 권한·네트워크 오류 안내를 추가했습니다. [원인 설명·설치 단계·검증 범위·오류별 조치](installation.md)를 확인하세요.
 
 **v0.7.0 변경:** 전체 11개 서비스 독립 조회, 자동 감지·연결, Linux 설치, 서비스별 재시도 제어, 30일 사용량 이력을 추가했습니다. 기본 설치는 독립 모드를 선택합니다. 기존 OpenUsage 연동을 유지하려면 `./install-existing.sh`를 사용하세요.
 
@@ -222,7 +224,7 @@ Antigravity, Claude, Codex, GitHub Copilot, Cursor, Devin, Grok, Ollama, OpenCod
 | `OH_MY_USAGE_CONFIG_DIR` | `$XDG_CONFIG_HOME/oh-my-usage` 또는 `~/.config/oh-my-usage` |
 | `OH_MY_USAGE_CACHE_DIR` | macOS: `~/Library/Caches/oh-my-usage`, Linux: `$XDG_CACHE_HOME/oh-my-usage` 또는 `~/.cache/oh-my-usage` |
 | `OH_MY_USAGE_SOURCE` | `direct` / `openusage`. 저장한 소스보다 우선 |
-| `OH_MY_USAGE_PYTHON` | 자동 감지. Python 실행 파일 지정 |
+| `OH_MY_USAGE_PYTHON` | 전용 환경을 만들 때 사용할 Python. 설치된 명령은 기록된 전용 환경을 우선 사용 |
 | `OH_MY_USAGE_PREFERENCES` | OpenUsage plist 파일 직접 지정 |
 | `OH_MY_USAGE_APP_DIR` | OpenUsage.app이 있는 폴더. 설치와 `start`에서 사용 |
 

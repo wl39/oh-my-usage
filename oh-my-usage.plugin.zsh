@@ -1,11 +1,11 @@
 # iTerm2 status-bar transport, with an optional empty-input usage hint.
 [[ -o interactive ]] || return 0
 if (( ${+_OH_MY_USAGE_LOADED} )); then
-  [[ ${_OH_MY_USAGE_VERSION:-} == 0.7.0 ]] && return 0
+  [[ ${_OH_MY_USAGE_VERSION:-} == 0.7.1 ]] && return 0
   # Restore the theme before replacing a previously loaded version.
   (( ${+functions[oh-my-usage-unload]} )) && oh-my-usage-unload
 fi
-typeset -g _OH_MY_USAGE_LOADED=1 _OH_MY_USAGE_VERSION=0.7.0
+typeset -g _OH_MY_USAGE_LOADED=1 _OH_MY_USAGE_VERSION=0.7.1
 typeset -g _OH_MY_USAGE_ROOT=${${(%):-%x}:A:h}
 if [[ $OSTYPE == darwin* ]]; then
   typeset -g _OH_MY_USAGE_CACHE=${OH_MY_USAGE_CACHE_DIR:-$HOME/Library/Caches/oh-my-usage}
@@ -13,6 +13,9 @@ else
   typeset -g _OH_MY_USAGE_CACHE=${OH_MY_USAGE_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/oh-my-usage}
 fi
 typeset -g _OH_MY_USAGE_CONFIG=${OH_MY_USAGE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/oh-my-usage}
+# Match Python's expanduser() for quoted ~/ path overrides without evaluating them.
+[[ $_OH_MY_USAGE_CACHE != \~/* ]] || _OH_MY_USAGE_CACHE=$HOME/${_OH_MY_USAGE_CACHE#\~/}
+[[ $_OH_MY_USAGE_CONFIG != \~/* ]] || _OH_MY_USAGE_CONFIG=$HOME/${_OH_MY_USAGE_CONFIG#\~/}
 typeset -g _OH_MY_USAGE_NEXT=0 OH_MY_USAGE_TEXT=''
 typeset -g _OH_MY_USAGE_ENCODED='?'
 zmodload zsh/datetime

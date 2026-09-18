@@ -1,4 +1,4 @@
-# oh-my-usage · v0.7.0
+# oh-my-usage · v0.7.1
 
 **[English](../README.md) · [简体中文](README.zh-CN.md) · [한국어](README.ko.md)**
 
@@ -159,7 +159,7 @@ oh-my-usage config icons unicode
 
 通过 SSH 连接到已安装并登录客户端的 macOS 或 Linux 账户，使用 zsh 即可。用量在该主机读取；无需 API 端口转发或在手机安装 iTerm2。登录和用量不会自动在主机间复制。
 
-## 更新到 v0.7.0
+## 更新到 v0.7.1
 
 在克隆的仓库目录中运行：
 
@@ -169,6 +169,8 @@ git pull --ff-only
 ```
 
 在交互式终端中，安装程序会读取用量并进入配置好的 zsh。如果首次安装使用了自定义 `--prefix` 或 `--no-shell`，请保留相同选项。
+
+**v0.7.1 安装改进：**修复不完整的环境和签名依赖，处理无关 APT 仓库错误，识别 `.zshenv` 配置位置，并按阶段报告权限和网络问题。
 
 **v0.7.0 更新：** 11 个服务的独立适配器、自动发现连接、Linux 安装、服务级重试和 30 天用量快照。`./install.sh` 选择独立模式；`./install-existing.sh` 保留可选的 OpenUsage 集成。
 
@@ -210,7 +212,7 @@ git pull --ff-only
 | `OH_MY_USAGE_CONFIG_DIR` | `$XDG_CONFIG_HOME/oh-my-usage`，或 `~/.config/oh-my-usage` |
 | `OH_MY_USAGE_CACHE_DIR` | macOS: `~/Library/Caches/oh-my-usage`；Linux: `$XDG_CACHE_HOME/oh-my-usage` 或 `~/.cache/oh-my-usage` |
 | `OH_MY_USAGE_SOURCE` | `direct` / `openusage`，覆盖保存的来源 |
-| `OH_MY_USAGE_PYTHON` | 自动检测；指定 Python 可执行文件 |
+| `OH_MY_USAGE_PYTHON` | 创建独立环境时使用的 Python；已安装命令优先使用记录的运行环境 |
 | `OH_MY_USAGE_PREFERENCES` | 可选的 OpenUsage plist 文件 |
 | `OH_MY_USAGE_APP_DIR` | 包含 OpenUsage.app 的目录，供安装和 `start` 使用 |
 

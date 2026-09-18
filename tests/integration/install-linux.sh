@@ -95,6 +95,12 @@ PY
 zsh -di -c 'whence -w oh-my-usage; oh-my-usage --version'
 # PTY is needed to exercise automatic entry into an immediately usable shell.
 python3 /src/tests/integration/install-pty.py
+if [ -z "${OH_MY_USAGE_TEST_BAD_APT:-}" ] && [ "$(id -u)" -ne 0 ]; then
+  wheels=$(mktemp -d)
+  "$prefix/.venv/bin/python" -m pip download --disable-pip-version-check --only-binary=:all: -r /src/requirements.txt -d "$wheels"
+  python3 /src/tests/integration/install-recovery.py "$wheels"
+  rm -rf "$wheels"
+fi
 "$prefix/install.sh" uninstall
 test ! -e "$prefix"
 test ! -e "$HOME/.local/bin/oh-my-usage"

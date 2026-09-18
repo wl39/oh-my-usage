@@ -36,9 +36,18 @@ if [ "$platform" = Linux ] && { [ "$mode" = full ] || [ "$mode" = existing ]; };
   mode=direct
 fi
 python=${OH_MY_USAGE_PYTHON:-python3}
+# Python configured for another project must not redirect this private runtime.
+unset PYTHONHOME PYTHONUSERBASE PYTHONPATH
 export PYTHONDONTWRITEBYTECODE=1
 if [ "$mode" = uninstall ]; then
-  if [ -r "$prefix/python-path" ] && [ -z "${OH_MY_USAGE_PYTHON:-}" ]; then IFS= read -r python < "$prefix/python-path"; fi
+  if [ -r "$prefix/python-path" ]; then
+    IFS= read -r installed_python < "$prefix/python-path"
+    if "$installed_python" -c 'import sys; sys.exit(sys.version_info < (3, 9))' >/dev/null 2>&1; then
+      python=$installed_python
+    elif ! "$python" -c 'import sys; sys.exit(sys.version_info < (3, 9))' >/dev/null 2>&1; then
+      python=/usr/bin/python3
+    fi
+  fi
   PYTHONPATH="$root" exec "$python" "$root/scripts/install.py" uninstall "$@"
 fi
 # Do not install into root's home merely because the user prefixed the command with sudo.

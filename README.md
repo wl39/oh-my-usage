@@ -1,4 +1,4 @@
-# oh-my-usage · v0.7.0
+# oh-my-usage · v0.7.1
 
 **[English](README.md) · [简体中文](docs/README.zh-CN.md) · [한국어](docs/README.ko.md)**
 
@@ -163,7 +163,7 @@ Then use `oh-my-usage start`. Existing profiles/layouts are preserved. This is a
 
 SSH into the macOS or Linux account where the clients are installed and signed in, use zsh, and enable inline display. Usage is collected on that host. API forwarding and iTerm2 on your phone are unnecessary. Credentials and usage do not automatically transfer between machines. Prompt integration uses zsh; the CLI works from other shells.
 
-## Update to v0.7.0
+## Update to v0.7.1
 
 From your cloned repository:
 
@@ -173,6 +173,8 @@ git pull --ff-only
 ```
 
 In an interactive terminal the installer refreshes usage and opens a ready zsh. Reuse any custom `--prefix` or `--no-shell` option from your original install.
+
+**v0.7.1:** repairs incomplete installs, handles unrelated APT repository failures, checks real signing functionality, follows `.zshenv` configuration paths, and reports permission/network failures by stage. [Installation diagnostics (한국어)](docs/installation.md).
 
 **New in v0.7.0:** independent adapters for all 11 services, automatic connection discovery, Linux installation, per-service cooldowns, and 30-day snapshot history. `./install.sh` selects direct collection; use `./install-existing.sh` to retain the optional OpenUsage backend.
 
@@ -222,7 +224,7 @@ Optional environment variables, placed before the plugin loads:
 | `OH_MY_USAGE_CONFIG_DIR` | `$XDG_CONFIG_HOME/oh-my-usage`, or `~/.config/oh-my-usage` |
 | `OH_MY_USAGE_CACHE_DIR` | macOS: `~/Library/Caches/oh-my-usage`; Linux: `$XDG_CACHE_HOME/oh-my-usage` or `~/.cache/oh-my-usage` |
 | `OH_MY_USAGE_SOURCE` | `direct` or `openusage`; overrides the saved source |
-| `OH_MY_USAGE_PYTHON` | Detected Python; override its executable path |
+| `OH_MY_USAGE_PYTHON` | Python used to create the private environment; installed commands prefer their recorded runtime |
 | `OH_MY_USAGE_PREFERENCES` | Optional OpenUsage plist file |
 | `OH_MY_USAGE_APP_DIR` | Folder containing OpenUsage.app, for installation and `start` |
 

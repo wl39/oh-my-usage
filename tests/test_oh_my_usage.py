@@ -278,7 +278,9 @@ class CacheTests(unittest.TestCase):
             fcntl.flock(lock, fcntl.LOCK_EX)
             def first_reader():
                 time.sleep(0.1)
-                (self.root / "display").write_text(f"{NOW}\nReady\nUmVhZHk=\nauto|auto\n")
+                # Publish exactly as the real writer does: exists() must never
+                # expose a newly created but still empty file to the reader.
+                cache.atomic_write(self.root / "display", f"{NOW}\nReady\nUmVhZHk=\nauto|auto\n")
                 fcntl.flock(lock, fcntl.LOCK_UN)
             worker = threading.Thread(target=first_reader)
             worker.start()
@@ -421,7 +423,7 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, __version__ + "\ninline: on (saved)\n")
         self.assertEqual({p.name for p in (self.prefix / "docs").iterdir()},
-                         {"README.ko.md", "README.zh-CN.md", "providers.md"})
+                         {"README.ko.md", "README.zh-CN.md", "providers.md", "installation.md"})
         self.assertFalse((self.prefix / "scripts/check.sh").exists())
         self.assertFalse((self.prefix / "tests").exists())
 
@@ -694,7 +696,7 @@ _OH_MY_USAGE_LOADED=1
 RPROMPT='old usage + theme'
 oh-my-usage-unload() { RPROMPT=theme; unset _OH_MY_USAGE_LOADED; }
 source "$PLUGIN"
-[[ $RPROMPT == theme && $_OH_MY_USAGE_VERSION == 0.7.0 ]]
+[[ $RPROMPT == theme && $_OH_MY_USAGE_VERSION == 0.7.1 ]]
 '''
         with tempfile.TemporaryDirectory() as temp:
             self.assertEqual(self.run_pty(script, Path(temp)), b"")

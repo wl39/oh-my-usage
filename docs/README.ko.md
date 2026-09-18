@@ -1,10 +1,10 @@
-# oh-my-usage · v0.6.1
+# oh-my-usage · v0.7.0
 
 **[English](../README.md) · [简体中文](README.zh-CN.md) · [한국어](README.ko.md)**
 
-[OpenUsage](https://github.com/robinebers/openusage) 사용량을 **iTerm2 상태바**에 표시합니다. 옵션을 켜면 입력이 비어 있을 때 터미널 안에도 옅게 표시하고, 입력하면 숨깁니다.
+**11개 AI 서비스의 사용량을 직접 조회**해 zsh 프롬프트와 **iTerm2 상태바**에 표시합니다. 설치·로그인된 클라이언트를 자동으로 찾고, 입력을 시작하면 프롬프트의 사용량 표시를 숨깁니다.
 
-**Mac + zsh + iTerm2 환경에서 가장 호환성이 좋습니다.** macOS 15+, Python 3.9+, 네이티브 OpenUsage가 필요합니다(0.7.6 기준 검증). Oh My Zsh는 선택 사항입니다. 다른 터미널과 휴대폰 SSH 앱에서도 같은 Mac 계정에 접속하면 내부 표시를 사용할 수 있습니다.
+**macOS와 Linux를 지원합니다.** Python 3.9+가 필요하며, 프롬프트 연동에는 zsh를 사용합니다. OpenUsage와 Oh My Zsh는 선택 사항입니다. 설치 시 전용 Python 환경을 만들고 Ollama 서명용 `cryptography`를 설치합니다. CLI는 다른 셸에서도 실행할 수 있습니다.
 
 ## 데모
 
@@ -29,7 +29,7 @@ cd oh-my-usage
 ./install.sh
 ```
 
-OpenUsage가 있으면 그대로 사용하고, 없으면 Homebrew로 설치합니다. Python도 필요할 때 설치합니다. Homebrew가 필요한데 없다면 [brew.sh](https://brew.sh)에서 먼저 설치하세요. OpenUsage의 **Customize**에서 사용할 제공자를 켜고 원하는 지표에 별을 선택합니다.
+Python과 zsh를 먼저 준비하세요. Debian/Ubuntu에서는 `sudo apt-get install python3 python3-venv zsh`, macOS에서는 필요할 때 `brew install python zsh`를 사용합니다. `./install.sh` 자체는 sudo 없이 실행합니다. 기본 설치는 OpenUsage 없이 동작하는 `direct` 모드이며 새 설치에서는 내부 표시가 자동으로 켜집니다. 기존 표시 설정은 보존합니다.
 
 **설치 후 새 zsh 터미널 탭을 한 번 여세요.** 이후에는 이 명령 하나로 실행합니다.
 
@@ -37,7 +37,7 @@ OpenUsage가 있으면 그대로 사용하고, 없으면 Homebrew로 설치합�
 oh-my-usage start
 ```
 
-OpenUsage를 포커스 이동 없이 열고, 사용량을 조회해 표시를 갱신합니다. 일반 설치에서는 `source`, PATH 설정, `.zshrc` 수동 편집이 필요 없습니다. 이후 새 탭은 연동을 자동으로 불러오며, 앱을 다시 열거나 갱신할 때 `start`를 사용하면 됩니다.
+전체 서비스의 로컬 로그인 정보를 감지하고 조회 가능한 사용량을 표시합니다. 새 탭의 첫 프롬프트에서도 자동으로 조회하므로 매번 `start`를 실행할 필요는 없습니다. 새로 설치하거나 로그인한 서비스도 다음 갱신 시 연결합니다. 일반 설치에서는 `source`, PATH 설정, `.zshrc` 수동 편집이 필요 없습니다.
 
 > 설치 프로그램은 별도 프로세스라서 이미 열린 셸에는 명령을 직접 추가할 수 없습니다. 설치 직후 새 탭만 한 번 열어 주세요. iTerm2 상태바는 아래 컴포넌트 추가도 최초 한 번 필요합니다. 터미널 내부 표시에는 상태바 설정이 필요 없습니다.
 
@@ -49,7 +49,11 @@ OpenUsage를 포커스 이동 없이 열고, 사용량을 조회해 표시를 �
 | --- | --- |
 | `oh-my-usage` | 도움말 표시. 사용량은 조회하지 않음 |
 | `oh-my-usage help` / `oh-my-usage --help` | 같은 도움말 표시 |
-| `oh-my-usage start` | OpenUsage 실행 및 표시 갱신 |
+| `oh-my-usage start` | 서비스 자동 감지 및 사용량 갱신 |
+| `oh-my-usage providers --refresh` | 11개 서비스 연결 상태 확인 및 조회 |
+| `oh-my-usage connect openrouter` | API 키를 숨김 입력으로 저장 |
+| `oh-my-usage history --provider codex` | 저장된 사용량 이력 출력(JSON) |
+| `oh-my-usage config source direct` | 독립 조회 모드 선택 |
 | `oh-my-usage inline on` | 내부 표시 켜기. **현재·다음 세션 모두 유지** |
 | `oh-my-usage inline off` | 내부 표시 끄기. **현재·다음 세션 모두 유지** |
 | `oh-my-usage inline on --session` | 현재 셸에서만 켜기 |
@@ -66,17 +70,17 @@ OpenUsage를 포커스 이동 없이 열고, 사용량을 조회해 표시를 �
 oh-my-usage inline on
 ```
 
-기본값은 꺼짐입니다. 한 번 켜면 새 탭과 이후 **같은 계정으로 접속하는 SSH 세션**에도 자동 적용됩니다. 이미 열린 다른 탭은 다음 프롬프트부터 변경값을 반영합니다. `--session`은 현재 셸만 바꾸고 저장값은 유지합니다. 플래그 없이 `inline on/off`를 실행하면 현재 셸의 임시 설정을 해제하고 새 값을 저장합니다.
+새 독립 설치에서는 켜짐으로 저장합니다. 기존 저장값은 유지합니다. 한 번 켜면 새 탭과 이후 **같은 계정으로 접속하는 SSH 세션**에도 자동 적용됩니다. 이미 열린 다른 탭은 다음 프롬프트부터 변경값을 반영합니다. `--session`은 현재 셸만 바꾸고 저장값은 유지합니다. 플래그 없이 `inline on/off`를 실행하면 현재 셸의 임시 설정을 해제하고 새 값을 저장합니다.
 
 - 새 탭의 첫 프롬프트에서 바로 표시합니다. 캐시가 없으면 최초 조회가 끝나는 즉시 같은 줄을 갱신하므로 Enter를 누를 필요가 없습니다.
 - 입력이 완전히 비어 있을 때만 기본적으로 옅은 회색(`245`)으로 표시합니다.
 - 문자·공백·붙여넣기·이전 명령·여러 줄 입력 중에는 숨깁니다. 전부 지우면 다시 표시합니다.
-- 화면이 80칸 이상이면 오른쪽 프롬프트 옆, 더 좁으면 입력줄 위에 표시합니다. 긴 내용은 `…`로 줄입니다.
+- 화면이 80칸 이상이면 기본적으로 오른쪽 프롬프트 옆에 표시합니다. `position left`로 기존 왼쪽 프롬프트 앞에 붙일 수 있습니다. 더 좁은 화면에서는 어느 모드든 입력줄 위에 표시합니다. 긴 내용은 `…`로 줄입니다.
 - 입력 중에도 iTerm2 상태바는 계속 표시됩니다.
 
 설정은 `.zshrc` 대신 `~/.config/oh-my-usage/inline` 파일 하나에 저장합니다. 우선순위는 **`--session` → 저장값 → `OH_MY_USAGE_INLINE` → 꺼짐**입니다. v0.4에서 넣었던 `export OH_MY_USAGE_INLINE=...`보다 새로 저장한 값이 우선합니다.
 
-### 설정 메뉴: 사용량·남은 양, 순서, 색상
+### 설정 메뉴: 위치, 아이콘, 사용량·남은 양, 순서, 색상
 
 ```zsh
 oh-my-usage config
@@ -84,21 +88,66 @@ oh-my-usage config
 
 번호를 고르고 값을 선택하면 바로 저장됩니다. 선택 도중 Enter는 취소, 첫 메뉴에서 `0`은 종료입니다. 내부 표시 켜기/끄기, **used(사용량) / left(남은 양)**, **Claude → Codex / Codex → Claude**, 직접 지정하는 제공자 순서, 옅은 색상 프리셋과 256색 번호를 선택할 수 있습니다.
 
+**`9`번을 선택하면 ‘왼쪽 + 아이콘 + 남은 %’를 한 번에 적용하고 내부 표시를 켭니다.** 제공자마다 지표 하나를 선택한 경우 다음처럼 보입니다.
+
+```text
+✳ 72% | ◇ 58% (left) ~/project >
+```
+
+설정 화면과 `config show`에서 위치·아이콘·비율·순서·색상의 미리보기를 볼 수 있습니다. 저장된 사용량을 사용하며, 데이터나 설정을 읽을 수 없으면 **sample data**로 표시한 예시를 사용합니다. 프리뷰의 프롬프트는 예시이며 실제 셸 테마는 유지됩니다. 미리보기를 위해 API를 호출하지 않습니다.
+
+아이콘은 `✳`(Claude), `◇`(Codex) 같은 **유니코드 문자 기호**로 표시합니다. 이미지 전송이나 Nerd Font 전용 문자는 사용하지 않습니다. 터미널 폰트에서 기호가 깨지거나 간격이 어긋나면 `8`번에서 **ASCII (`CL`, `CX`)**로 바꾸세요. 등록되지 않은 제공자는 이름을 표시합니다. 지표가 둘이면 `◇ S:58%/W:90%`처럼 세션(`S`)·주간(`W`)을 구분합니다. 한도가 있는 지표는 비율로, 잔액·텍스트 지표는 원래 단위로 표시합니다.
+
+같은 설정 화면에서 세부 항목도 바꿀 수 있습니다.
+
+| 번호 | 설정 |
+| --- | --- |
+| `6` | 왼쪽 프롬프트 앞·뒤, 별도 윗줄, 오른쪽, 자동 배치 |
+| `10` | 제공자별·지표별 켜기 / 끄기 / 소스 기본값 |
+| `11` | 제공자별 아이콘·짧은 이름 직접 입력. `none`은 아이콘 숨김, `auto`는 기본값 복원 |
+| `12` | 프롬프트 간격 0–8칸, 왼쪽·윗줄 들여쓰기 0–20칸, 최대 너비 1–240칸 또는 자동 |
+| `13` | 지표 이름, `(used)`·`(left)` 표시, 제공자 구분자 선택 |
+
+각 편집 화면에서 변경된 미리보기를 확인할 수 있습니다. 캐시에 있는 지표는 별표가 없어도 직접 켤 수 있으며, 제공자도 켜져 있어야 표시합니다. 직접 선택한 지표는 두 개를 넘어도 표시하고, 모두 끄면 내부 힌트를 숨깁니다. 없는 데이터는 0%로 만들지 않습니다. 세부 선택은 내부 표시에만 적용하며 OpenUsage 및 상태바 선택은 유지합니다. `9`번 프리셋은 세부 선택을 유지하고, `5`번 초기화는 세부 선택도 지웁니다.
+
+```zsh
+oh-my-usage config icon claude '✦'
+oh-my-usage config icon codex 'C>'
+oh-my-usage config provider claude off
+oh-my-usage config metric codex.session on
+oh-my-usage config metric codex.weekly off
+oh-my-usage config position above
+oh-my-usage config indent 2
+oh-my-usage config gap 2
+oh-my-usage config width 48
+oh-my-usage config metric-labels off
+oh-my-usage config mode-label off
+oh-my-usage config separator space
+```
+
+사용자 지정 아이콘은 출력 가능한 문자 1–12자로, 아이콘 스타일에서 Unicode/ASCII보다 우선합니다. 메뉴의 아이콘 편집기는 아이콘 스타일도 켭니다. CLI에서는 `config style icons`를 사용하세요. `config icon codex auto`, `config provider claude auto`, `config metric codex.weekly auto`처럼 항목 하나만 복원할 수도 있습니다. 편집기 목록을 만들기 위해 API를 조회하지 않습니다. `config show`는 저장된 개별 설정도 나열합니다.
+
 명령으로 바로 바꿔도 됩니다.
 
 ```zsh
 oh-my-usage config mode left
 oh-my-usage config order claude,codex
 oh-my-usage config color cyan
+oh-my-usage config position left
+oh-my-usage config style icons
+oh-my-usage config icons unicode
 ```
 
-- `mode used`: 사용량, `mode left`: 남은 양. `mode auto`는 OpenUsage 설정을 따릅니다.
-- `order claude,codex`: Claude 다음 Codex 순서. 나머지 활성 제공자는 뒤에 이어집니다. 제공자를 켜거나 별 선택을 바꾸지는 않습니다. `order auto`는 OpenUsage 순서로 돌아갑니다.
+- `mode used`: 사용량, `mode left`: 남은 양. `mode auto`는 소스 기본값을 따릅니다(독립 모드: 사용량).
+- `order claude,codex`: Claude 다음 Codex 순서. 나머지 활성 제공자는 뒤에 이어집니다. 제공자를 켜거나 별 선택을 바꾸지는 않습니다. `order auto`는 소스 기본 순서로 돌아갑니다.
 - `color`: `gray`, `cyan`, `green`, `blue`, `purple`, `yellow`, `red`, `white` 또는 `0`~`255`. 저장 색상이 `OH_MY_USAGE_INLINE_COLOR`보다 우선하며, `color auto`로 환경 변수/기본 색상으로 돌아갑니다.
+- `position left/after/above/right/auto`: 왼쪽 프롬프트 앞·뒤, 윗줄, 오른쪽, 자동 배치. `auto`는 기존 오른쪽 표시를 유지합니다. 80칸 미만에서는 모두 입력줄 위에 표시합니다. 저장된 `width`는 `OH_MY_USAGE_INLINE_WIDTH`보다 우선하며 화면 공간 이내로 제한합니다.
+- `style text/icons`: 전체 이름·아이콘 표시 선택. `icons unicode/ascii`: 문자 기호·영문 약칭 선택. 기본값은 `text`, `unicode`입니다.
 - **색상은 터미널 내부 표시에 적용됩니다.** iTerm2 상태바 색상은 Interpolated String 컴포넌트 설정에서 바꿉니다. used/left와 순서는 두 표시 모두에 적용됩니다.
-- `config show`: 저장값 확인. `config reset`: 사용량 모드·순서·색상 초기화. 내부 표시 켜기/끄기는 유지합니다.
+- 위치·스타일·아이콘은 내부 표시에만 적용하며 iTerm2 상태바의 전체 텍스트 표시는 유지됩니다.
+- `config show`: 저장값과 미리보기 확인. `config reset`: 표시 설정 전체 초기화. 내부 표시 켜기/끄기는 유지합니다.
 
-`~/.config/oh-my-usage` 또는 지정한 설정 폴더에 작은 파일(`inline`, `mode`, `order`, `color`)로 저장합니다. 새 탭·SSH 세션·업데이트 후에도 유지되며 OpenUsage 앱 설정은 바꾸지 않습니다. 다른 열린 탭은 다음 프롬프트부터 반영합니다. `inline --session`으로 지정한 값은 해당 셸에서 계속 우선합니다. 유효한 캐시가 있으면 API 재조회 없이 모드와 순서를 바꿉니다.
+`~/.config/oh-my-usage` 또는 지정한 설정 폴더에 작은 파일(`inline`, `mode`, `order`, `color`, `position`, `style`, `icons`, `gap`, `indent`, `width`, `metric-labels`, `mode-label`, `separator` 및 JSON 맵 `icon-map`, `providers`, `metrics`)로 저장합니다. 새 탭·SSH 세션·업데이트 후에도 유지되며 OpenUsage 앱 설정은 바꾸지 않습니다. 다른 열린 탭은 다음 프롬프트부터 반영합니다. `inline --session`으로 지정한 값은 해당 셸에서 계속 우선합니다. 유효한 캐시가 있으면 API 재조회 없이 모드와 순서를 바꿉니다.
 
 ### iTerm2 상태바: 최초 한 번 설정
 
@@ -112,13 +161,11 @@ oh-my-usage config color cyan
 
 이후 `oh-my-usage start`로 실행하면 됩니다. 기존 프로필과 배치는 유지합니다. 별도 위젯이 아닌 iTerm2 기본 컴포넌트를 사용합니다. [iTerm2 공식 안내](https://iterm2.com/documentation-status-bar.html).
 
-### SSH / Termius / 아이폰
+### SSH / Termius / iPhone
 
-OpenUsage가 실행 중인 같은 Mac 계정에 SSH로 접속한 뒤, zsh에서 `oh-my-usage inline on`을 한 번 실행합니다. 다음 접속부터 기억합니다. OpenUsage가 꺼져 있다면 `oh-my-usage start`로 Mac에서 엽니다.
+클라이언트가 설치·로그인된 macOS 또는 Linux 계정으로 SSH 접속해 zsh를 사용하면 됩니다. 사용량은 해당 호스트에서 읽고 휴대폰에는 프롬프트만 표시합니다. API 포트 전달이나 휴대폰의 iTerm2는 필요하지 않습니다. 다른 서버로 로그인·사용량이 자동 복사되지는 않습니다.
 
-데이터는 Mac이 읽고, 접속한 기기는 화면을 표시합니다. 아이폰에 iTerm2를 설치하거나 API 포트를 열거나 `TERM_PROGRAM`을 꾸밀 필요가 없습니다. 이전에 Termius에서 `TERM_PROGRAM=iTerm.app`을 강제로 설정했다면 해당 줄을 지우세요. 다른 서버에 원래 Mac의 사용량이 자동 전달되지는 않습니다. Windows·Linux·휴대폰은 SSH 클라이언트로 사용할 수 있지만 데이터 조회 호스트는 지원하지 않습니다. Bash·Fish·PowerShell 및 구 Tauri OpenUsage도 지원하지 않습니다.
-
-## v0.6.1으로 업데이트
+## v0.7.0으로 업데이트
 
 내려받은 저장소 폴더에서 실행합니다.
 
@@ -129,7 +176,17 @@ git pull --ff-only
 
 새 탭을 열고 `oh-my-usage start`를 실행합니다. 처음에 사용자 지정 `--prefix`나 `--no-shell`을 썼다면 같은 옵션을 붙이세요.
 
-**v0.6.1 변경:** agnoster처럼 오른쪽 프롬프트를 미리 만들지 않는 테마와, 입력 편집기가 아직 불러와지지 않은 새 셸의 첫 표시 문제를 수정했습니다. 빠른 시작 테마가 터미널 출력을 복원한 뒤에도 표시를 적용합니다. Enter·시작 지연·상주 프로세스는 필요 없습니다. v0.6의 저장형 설정 메뉴는 그대로 사용할 수 있습니다.
+**v0.7.0 변경:** 전체 11개 서비스 독립 조회, 자동 감지·연결, Linux 설치, 서비스별 재시도 제어, 30일 사용량 이력을 추가했습니다. 기본 설치는 독립 모드를 선택합니다. 기존 OpenUsage 연동을 유지하려면 `./install-existing.sh`를 사용하세요.
+
+## 자동 연결과 추적 범위
+
+Antigravity, Claude, Codex, GitHub Copilot, Cursor, Devin, Grok, Ollama, OpenCode, OpenRouter, Z.ai를 지원합니다. 각 클라이언트의 로컬 로그인 정보를 사용하며, OpenRouter와 Z.ai 등은 API 키가 필요합니다. [서비스별 인증 경로·지표·제약](providers.md)을 확인하세요.
+
+기본 30초 간격의 프롬프트 갱신에서 전체 서비스의 설치·로그인을 다시 감지합니다. 사용량 API는 서비스별 5분 간격으로 조회하며 새 인증정보는 즉시 반영합니다. `refresh`는 강제 조회하지만 서버가 지정한 호출 제한 대기 시간은 지킵니다. 셸이 대기 중이거나 명령을 실행하는 동안 상주 수집하지 않습니다. 무인 서버에서는 CLI를 원하는 주기로 실행하면 됩니다.
+
+성공한 조회의 수치·단위·초기화 시각을 30일 동안 저장합니다. `history --provider codex --days 7`은 현재 인증정보에 해당하는 기록을 JSON으로 보여줍니다. 설치 이전의 토큰 비용을 복원하는 기능은 아니며 OpenUsage의 모든 비용 추정·UI 기능을 재현하지는 않습니다. 로그인 만료 시 각 클라이언트에서 갱신·재로그인합니다. 캐시에는 인증정보·계정 이름·대화 내용을 넣지 않습니다.
+
+설정 메뉴 `14`에서 소스를, `15`에서 전체 서비스 연결 상태를 확인할 수 있습니다. 표시는 기본적으로 서비스당 두 지표이며 지표 설정에서 더 추가할 수 있습니다.
 
 ## 문제 해결
 
@@ -142,7 +199,8 @@ git pull --ff-only
 | 내부 표시가 안 나옴 | `inline status` 확인 후 `inline on`, 입력 전부 지우기. 매우 긴 테마는 오른쪽 공간을 가릴 수 있음 |
 | `[offline]` | 같은 Mac 계정에서 `start`. 마지막으로 받은 데이터를 표시 중 |
 | 제공자 이름 뒤 `~` | 데이터가 10분 넘게 오래됐거나 시간 정보가 유효하지 않음 |
-| `no pinned data` | OpenUsage에서 제공자를 켜고 데이터가 있는 지표에 별 선택 |
+| `no connected services` | `providers`에서 상태를 보고 클라이언트 로그인 또는 API 키 설정 |
+| `no pinned data` (OpenUsage 모드) | OpenUsage에서 제공자와 별을 선택 |
 | `menuBarPins` / 설정 오류 | 현재 버전 사용, Customize에서 별을 껐다 켜기, 앱 재실행 후 `refresh` |
 
 `menuBarPins` 키가 없으면 기본 별을 사용하고, 저장된 빈 목록은 그대로 유지합니다. `OH_MY_USAGE_DISPLAY=off`는 두 표시를 모두 끕니다. `start`는 현재 셸에서 연동을 다시 켭니다.
@@ -152,7 +210,7 @@ git pull --ff-only
 <details>
 <summary>설치 모드·환경 변수·스크립트·Oh My Zsh</summary>
 
-기존 두 모드도 유지합니다. `./install-full.sh`는 OpenUsage가 없으면 설치하고, `./install-existing.sh`는 설치된 앱만 사용합니다. 설치 위치는 `~/.local/share/oh-my-usage`입니다. 셸 설정을 백업하고 `~/.zshrc` 또는 `$ZDOTDIR/.zshrc`에 플러그인을 등록합니다. `sudo`는 사용하지 마세요. `--prefix /원하는/경로`로 위치를 바꾸거나 `--no-shell`로 셸 로딩을 직접 관리할 수 있습니다.
+기본 `./install.sh`는 macOS/Linux 독립 설치입니다. 기존 macOS 전용 두 모드도 유지합니다. `./install-full.sh`는 OpenUsage가 없으면 설치하고, `./install-existing.sh`는 설치된 앱만 사용합니다. 설치 위치는 `~/.local/share/oh-my-usage`입니다. 셸 설정을 백업하고 `~/.zshrc` 또는 `$ZDOTDIR/.zshrc`에 플러그인을 등록합니다. `sudo`는 사용하지 마세요. `--prefix /원하는/경로`로 위치를 바꾸거나 `--no-shell`로 셸 로딩을 직접 관리할 수 있습니다.
 
 필요한 환경 변수만 플러그인 로딩 전에 설정합니다.
 
@@ -164,7 +222,8 @@ git pull --ff-only
 | `OH_MY_USAGE_DISPLAY` | `status`. `off`는 두 표시 모두 끄기 |
 | `OH_MY_USAGE_INTERVAL` | `30`. 캐시 유효 시간(초), 최소 5 |
 | `OH_MY_USAGE_CONFIG_DIR` | `$XDG_CONFIG_HOME/oh-my-usage` 또는 `~/.config/oh-my-usage` |
-| `OH_MY_USAGE_CACHE_DIR` | `~/Library/Caches/oh-my-usage` |
+| `OH_MY_USAGE_CACHE_DIR` | macOS: `~/Library/Caches/oh-my-usage`, Linux: `$XDG_CACHE_HOME/oh-my-usage` 또는 `~/.cache/oh-my-usage` |
+| `OH_MY_USAGE_SOURCE` | `direct` / `openusage`. 저장한 소스보다 우선 |
 | `OH_MY_USAGE_PYTHON` | 자동 감지. Python 실행 파일 지정 |
 | `OH_MY_USAGE_PREFERENCES` | OpenUsage plist 파일 직접 지정 |
 | `OH_MY_USAGE_APP_DIR` | OpenUsage.app이 있는 폴더. 설치와 `start`에서 사용 |
@@ -196,19 +255,19 @@ ln -s "$HOME/.local/share/oh-my-usage" \
 ~/.local/share/oh-my-usage/install.sh uninstall
 ```
 
-설치 파일·표시된 셸 블록·관리 대상 캐시를 제거합니다. OpenUsage·Python·다른 상태바 컴포넌트·백업·저장된 설정은 유지합니다. 열린 셸을 닫거나 `oh-my-usage-unload`를 실행하고, Interpolated String 및 직접 추가한 Oh My Zsh 항목·링크를 제거하세요. 사용자 지정 설치는 해당 경로의 `install.sh uninstall`을 사용합니다.
+설치 파일·표시된 셸 블록·표시 캐시를 제거합니다. 재설치를 위해 `direct` 사용량 이력과 저장한 API 키는 남겨두며, 삭제하려면 캐시의 `direct` 폴더와 설정의 `credentials.json`을 별도로 제거하세요. OpenUsage·Python·다른 상태바 컴포넌트·백업·저장된 설정은 유지합니다. 열린 셸을 닫거나 `oh-my-usage-unload`를 실행하고, Interpolated String 및 직접 추가한 Oh My Zsh 항목·링크를 제거하세요. 사용자 지정 설치는 해당 경로의 `install.sh uninstall`을 사용합니다.
 
-저장값까지 초기화하려면 설정 폴더의 `inline`, `mode`, `order`, `color` 파일을 제거하세요. 이후 환경 변수 또는 기본값이 적용됩니다.
+저장값까지 초기화하려면 `oh-my-usage config reset`을 실행하고 설정 폴더의 `inline` 파일을 제거하세요. 이후 환경 변수 또는 기본값이 적용됩니다.
 
 </details>
 
 ## 경량 구조와 개발
 
-Python 표준 라이브러리와 zsh만 사용합니다. pip 의존성·추가 상주 프로세스·주기적인 타이머가 없습니다. 탭끼리 캐시와 잠금을 공유합니다. 갱신 여부는 새 프롬프트 직전에 확인하며, 대기 중이거나 명령이 실행 중일 때 계속 조회하지 않습니다. 키 입력 처리는 zsh 내장 기능으로 처리하고 저장 설정은 프롬프트 시점에 읽습니다. 조회가 끝나면 일회성 파이프로 ZLE에 알려 첫 입력 줄을 다시 그린 뒤 파이프를 닫습니다. OpenUsage 앱 자체는 별도로 실행되어야 합니다.
+Python과 zsh를 사용하며 Ollama의 요청 서명에만 `cryptography`가 필요합니다. 탭끼리 캐시와 잠금을 공유하고 키 입력은 zsh 내장 기능으로 처리합니다. 수집은 일회성 프로세스이며 서비스별 오류를 분리합니다. 네이티브 인증 저장소는 읽기만 하고, macOS 키체인은 권한 창을 띄우지 않는 제한 시간 있는 별도 프로세스에서 읽습니다.
 
-조회기는 `http://127.0.0.1:6736/v1/usage`에만 요청하며 인증 정보·키체인·대화 로그를 읽지 않습니다. 캐시·설정 파일은 사용자 전용 권한으로 저장합니다. 별 선택·텍스트/막대 모드를 반영하며, 순서·Used/Left는 `config`에 저장한 값이 없으면 OpenUsage를 따릅니다. 제공자당 최대 두 지표, 막대는 전체 최대 네 지표입니다. 메뉴바 아이콘·색상·화면 공유 감지는 재현하지 않습니다. [legacy UI API](https://github.com/robinebers/openusage/blob/main/docs/local-http-api.md)와 상위 설정 형식은 바뀔 수 있습니다.
+`direct` 모드는 OpenUsage의 API·설정·캐시를 사용하지 않습니다. 선택적인 `openusage` 모드는 기존 로컬 API와 표시 설정을 유지합니다. 서비스의 일부 API는 비공개 형식이므로 변경될 수 있습니다. 참조한 OpenUsage 형식 구현의 MIT 고지는 `oh_my_usage/providers/third_party`에 있으며 설치에도 포함됩니다.
 
-`./scripts/check.sh`로 문법·단위 테스트와 실제 zsh 가상 터미널 테스트를 실행합니다. 세션 간 설정 유지도 검증합니다. 휴대폰 동작은 터미널 환경 재현이며 실제 아이폰 UI 자동 테스트는 아닙니다. 설정(`config.py`, `zsh/config.zsh`), 앱 시작(`start.py`), 데이터·표시 설정·렌더링·캐시, CLI, 셸 전송, 내부 표시를 모듈로 분리했습니다. 개인 노트·미리보기는 Git과 설치에서 제외합니다.
+개발 환경에 `requirements.txt`를 설치하고 `./scripts/check.sh`로 검증합니다. 11개 응답 형식, 로그인 감지, 서명, 실패·호출 제한, 이력, 실제 zsh 가상 터미널 테스트를 포함하며 CI는 macOS/Linux에서 실행합니다.
 
 README 이미지는 macOS에서 `scripts/record_demo.py`로 다시 만들 수 있습니다. 필요한 개발용 패키지는 파일 상단에 안내되어 있으며, 예시 데이터를 넣은 독립 zsh 세션을 사용합니다. 이미지 생성 도구와 이미지 파일은 프로그램 설치에서 제외됩니다.
 

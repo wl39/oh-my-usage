@@ -61,8 +61,9 @@ class Session:
                  "openusage.layout.v1.providerOrder": ["codex", "claude"]}
         providers = [{"providerId": name.lower(), "displayName": name,
                       "fetchedAt": datetime.now(timezone.utc).isoformat(),
-                      "lines": [{"type": "progress", "label": "Session", "used": used,
-                                 "limit": 100, "format": {"kind": "percent"}}]}
+                      "lines": [{"type": "progress", "label": label, "used": amount,
+                                 "limit": 100, "format": {"kind": "percent"}}
+                                for label, amount in (("Session", used), ("Weekly", used // 2))]}
                      for name, used in (("Codex", 42), ("Claude", 28))]
         (root / "prefs.plist").write_bytes(plistlib.dumps(prefs))
         (root / "usage.json").write_text(json.dumps(providers))
@@ -72,8 +73,11 @@ class Session:
         (root / "config").mkdir()
         (root / "config/inline").write_text("on\n")
         if configured:
-            for name, value in (("mode", "left"), ("order", "claude,codex"), ("color", "109")):
+            for name, value in (("mode", "left"), ("order", "claude,codex"), ("color", "109"),
+                                ("position", "left"), ("style", "icons"), ("gap", "2"), ("indent", "2")):
                 (root / "config" / name).write_text(value + "\n")
+            (root / "config/icon-map").write_text(json.dumps({"codex": "C>"}) + "\n")
+            (root / "config/metrics").write_text(json.dumps({"codex.weekly": "off"}) + "\n")
         (root / "sitecustomize.py").write_text(
             'import socket\ndef blocked(*args, **kwargs):\n'
             '    raise OSError("Network is disabled in the documentation demo")\n'
@@ -179,11 +183,19 @@ def main():
             ("mode left", "(left)", "04  /  Choose remaining allowance"),
             ("order claude,codex", "Claude Session 72%", "05  /  Put Claude before Codex"),
             ("color cyan", "color: 109 (saved)", "06  /  Save a muted color for future sessions"),
+            ("style icons", "✳ 72%", "07  /  Compact Unicode icons + remaining allowance"),
+            ("position left", "position: left (saved)", "08  /  Put usage before your left prompt"),
         ):
             session.send("oh-my-usage config " + command + "\r")
             session.expect(expected)
             session.read(0.2)
             snap(caption, 2400)
+        session.send("echo icons")
+        assert "✳" not in session.screen.display[session.screen.cursor.y]
+        snap("09  /  Left-side icons also disappear while typing", 1600)
+        session.send("\x15")
+        session.expect("✳ 72%")
+        snap("10  /  Clear input: left-side usage returns", 2200)
         cast = [{"version": 2, "width": COLS, "height": 8,
                  "title": "oh-my-usage — real zsh session with sample data",
                  "env": {"TERM": "xterm-256color", "SHELL": "/bin/zsh"}}] + session.events
@@ -196,12 +208,12 @@ def main():
     indexed = [image.quantize(palette=palette, dither=Image.Dither.NONE) for image in frames]
     indexed[0].save(OUTPUT / "inline-demo.gif", save_all=True, append_images=indexed[1:],
                     duration=[duration for _, _, duration in scenes], loop=0, optimize=True)
-    session = Session(rows=17, configured=True)
+    session = Session(rows=37, configured=True)
     try:
-        session.expect("Claude Session 72%")
+        session.expect("✳ 72%")
         session.send("oh-my-usage config\r")
-        session.expect("0. Done")
-        frame(session.screen, "SETTINGS  /  One command, saved for the next session").save(
+        session.expect("Symbols are text")
+        frame(session.screen, "SETTINGS  /  Custom icons, placement, and individual metric switches").save(
             OUTPUT / "settings.png", optimize=True)
         session.send("0\r")
     finally:
